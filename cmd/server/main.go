@@ -1,7 +1,16 @@
 package main
 
-import "fmt"
+import (
+	"kebabseller6/rwe/internal/handler"
+	"log"
+	"net/http"
+)
 
 func main() {
-	fmt.Println("started")
+	router, err := handler.NewRouter()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Fatal(http.ListenAndServe(":8999", router))
 }
