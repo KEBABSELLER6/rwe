@@ -1,0 +1,110 @@
+package runner
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+	"uuid"
+
+	"kebabseller6/rwe/internal/service"
+)
+
+const testImage = "busybox:1.37"
+
+func requireDocker(t *testing.T) {
+	t.Helper()
+	if testing.Short() {
+		t.Skip("docker tests skipped in -short mode")
+	}
+	if err := exec.Command("docker", "info").Run(); err != nil {
+		t.Skipf("docker not available: %v", err)
+	}
+}
+
+func spec(filesDir string, cmd ...string) service.RunSpec {
+	return service.RunSpec{
+		Name:     "rwe-test-" + uuid.NewV7().String(),
+		Image:    testImage,
+		Command:  cmd,
+		FilesDir: filesDir,
+		Timeout:  time.Minute,
+	}
+}
+
+func TestDocker_RunsInWorkspace(t *testing.T) {
+	requireDocker(t)
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "in.txt"), []byte("hello"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var logs bytes.Buffer
+	code, err := NewDocker().Run(t.Context(), spec(dir, "sh", "-c", "cat in.txt; echo oops >&2; echo built > out.txt"), &logs)
+	if err != nil {
+		t.Fatalf("Run: %v\nlogs:\n%s", err, logs.String())
+	}
+	if code != 0 {
+		t.Fatalf("exit code = %d\nlogs:\n%s", code, logs.String())
+	}
+	if !strings.Contains(logs.String(), "hello") || !strings.Contains(logs.String(), "oops") {
+		t.Errorf("logs missing stdout or stderr:\n%s", logs.String())
+	}
+
+	out := filepath.Join(dir, "out.txt")
+	if _, err := os.Stat(out); err != nil {
+		t.Fatalf("container output not visible on host: %v", err)
+	}
+	if err := os.Remove(out); err != nil {
+		t.Errorf("server user cannot delete container output: %v", err)
+	}
+}
+
+func TestDocker_ExitCode(t *testing.T) {
+	requireDocker(t)
+
+	code, err := NewDocker().Run(t.Context(), spec(t.TempDir(), "sh", "-c", "exit 3"), &bytes.Buffer{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if code != 3 {
+		t.Errorf("exit code = %d, want 3", code)
+	}
+}
+
+func TestDocker_TimeoutRemovesContainer(t *testing.T) {
+	requireDocker(t)
+	s := spec(t.TempDir(), "sleep", "300")
+	s.Timeout = 3 * time.Second
+
+	start := time.Now()
+	_, err := NewDocker().Run(t.Context(), s, &bytes.Buffer{})
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("err = %v, want DeadlineExceeded", err)
+	}
+	if took := time.Since(start); took > 30*time.Second {
+		t.Errorf("timeout took %v", took)
+	}
+
+	out, _ := exec.Command("docker", "ps", "--all", "--quiet", "--filter", "name="+s.Name).Output()
+	if len(bytes.TrimSpace(out)) != 0 {
+		t.Errorf("container %s still exists", s.Name)
+	}
+}
+
+func TestDocker_BadImageIsError(t *testing.T) {
+	requireDocker(t)
+	s := spec(t.TempDir(), "true")
+	s.Image = "rwe-does-not-exist.invalid/nope:1"
+
+	var logs bytes.Buffer
+	_, err := NewDocker().Run(t.Context(), s, &logs)
+	if err == nil {
+		t.Fatalf("expected error for missing image, logs:\n%s", logs.String())
+	}
+}

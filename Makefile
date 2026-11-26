@@ -1,4 +1,4 @@
-.PHONY: run test build vet
+.PHONY: run test build vet smoke
 
 run:
 	go run ./cmd/server
@@ -11,3 +11,6 @@ test:
 
 vet:
 	go vet ./...
+
+smoke:
+	./scripts/smoke.sh
