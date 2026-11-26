@@ -1,13 +1,15 @@
 package main
 
 import (
+	"context"
 	"kebabseller6/rwe/internal/handler"
 	"log"
 	"net/http"
 )
 
 func main() {
-	router, err := handler.NewRouter()
+	ctx := context.Background()
+	router, err := handler.NewRouter(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}

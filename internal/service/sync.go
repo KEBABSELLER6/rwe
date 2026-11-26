@@ -22,6 +22,10 @@ func (s *WorkspaceService) Sync(ctx context.Context, id uuid.UUID, want manifest
 	s.manifestMu.Lock()
 	defer s.manifestMu.Unlock()
 
+	if err := s.checkNotBusy(id); err != nil {
+		return nil, err
+	}
+
 	wsDir := filepath.Join(s.dir, id.String())
 
 	current, err := manifest.Load(filepath.Join(wsDir, "manifest.json"))

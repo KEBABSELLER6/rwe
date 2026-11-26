@@ -48,4 +48,10 @@ api() {
 	printf '%s\n' "$out"
 }
 
+# json_array ARGS...: JSON array of the arguments, safe for args starting with "-".
+json_array() {
+	if [[ $# -eq 0 ]]; then echo '[]'; return; fi
+	printf '%s\0' "$@" | jq -Rsc 'split("\u0000")[:-1]'
+}
+
 state_file() { echo "$1/.rwe/workspace"; }

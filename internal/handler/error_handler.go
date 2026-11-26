@@ -44,6 +44,8 @@ func (h *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err e
 		buildError(w, "invalid input", http.StatusBadRequest)
 	case errors.Is(err, service.ErrNotFound):
 		buildError(w, "not found", http.StatusNotFound)
+	case errors.Is(err, service.ErrConflict):
+		buildError(w, "conflict", http.StatusConflict)
 	default:
 		buildError(w, "internal error", http.StatusInternalServerError)
 	}

@@ -49,6 +49,10 @@ func (s *WorkspaceService) PutBlob(ctx context.Context, id uuid.UUID, sum string
 	s.manifestMu.Lock()
 	defer s.manifestMu.Unlock()
 
+	if err := s.checkNotBusy(id); err != nil {
+		return 0, err
+	}
+
 	target, err = manifest.Load(filepath.Join(wsDir, "target.json"))
 	if err != nil {
 		return 0, err

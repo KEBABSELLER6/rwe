@@ -1,14 +1,11 @@
 package handler
 
 import (
-	"context"
 	"encoding/json/v2"
 	"fmt"
-	"io"
 	"kebabseller6/rwe/internal/manifest"
 	"kebabseller6/rwe/internal/service"
 	"net/http"
-	"uuid"
 )
 
 type SyncRequest struct {
@@ -21,12 +18,6 @@ type SyncResponse struct {
 
 type UploadResponse struct {
 	Remaning int `json:"remaining"`
-}
-
-type FileService interface {
-	Create(ctx context.Context, body io.Reader) (service.Workspace, error)
-	Sync(ctx context.Context, id uuid.UUID, body manifest.Manifest) ([]string, error)
-	PutBlob(ctx context.Context, id uuid.UUID, sum string, body io.Reader) (int, error)
 }
 
 type WorkSpaceHandler struct {
@@ -62,22 +53,20 @@ func (h *WorkSpaceHandler) HandleCreate(w http.ResponseWriter, r *http.Request) 
 
 func (h *WorkSpaceHandler) HandleSync(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 4<<20)
-	json.RejectUnknownMembers(true)
 
 	if r.Header.Get("Content-Type") != "application/json" {
 		h.eh.HandleError(w, r, fmt.Errorf("%w: invalid content-type", service.ErrInvalidInput))
 		return
 	}
 
-	rawId := r.PathValue("id")
-	id, err := uuid.Parse(rawId)
+	id, err := getId(r)
 	if err != nil {
-		h.eh.HandleError(w, r, fmt.Errorf("%w: invalid workspace id", service.ErrInvalidInput))
+		h.eh.HandleError(w, r, err)
 		return
 	}
 
 	var req SyncRequest
-	err = json.UnmarshalRead(r.Body, &req)
+	err = json.UnmarshalRead(r.Body, &req, json.RejectUnknownMembers(true))
 	if err != nil {
 		h.eh.HandleError(w, r, fmt.Errorf("%w: invalid json", service.ErrInvalidInput))
 		return
@@ -108,10 +97,9 @@ func (h *WorkSpaceHandler) HandleUpload(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	rawId := r.PathValue("id")
-	id, err := uuid.Parse(rawId)
+	id, err := getId(r)
 	if err != nil {
-		h.eh.HandleError(w, r, fmt.Errorf("%w: invalid workspace id", service.ErrInvalidInput))
+		h.eh.HandleError(w, r, err)
 		return
 	}
 
@@ -127,8 +115,12 @@ func (h *WorkSpaceHandler) HandleUpload(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	res := UploadResponse{Remaning: remaining}
+	if remaining > 0 {
+		w.WriteHeader(http.StatusNoContent)
+	} else {
+		w.WriteHeader(http.StatusCreated)
+	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
 	json.MarshalWrite(w, res)
 }
