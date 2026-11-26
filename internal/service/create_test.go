@@ -6,7 +6,6 @@ import (
 	"compress/gzip"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json/v2"
 	"errors"
 	"os"
 	"path/filepath"
@@ -98,7 +97,7 @@ func TestCreate_OK(t *testing.T) {
 		t.Errorf("run.sh mode = %v, want 0755 without setuid", fi.Mode())
 	}
 
-	m, err := extractedManifest(filepath.Join(dir, ws.ID.String()))
+	m, err := manifest.Load(filepath.Join(dir, ws.ID.String(), manifestFile))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -215,13 +214,4 @@ func assertNoTempDirs(t *testing.T, dir string) {
 			t.Errorf("temp dir left behind: %s", e.Name())
 		}
 	}
-}
-
-func extractedManifest(wsDir string) (manifest.Manifest, error) {
-	raw, err := os.ReadFile(filepath.Join(wsDir, "manifest.json"))
-	if err != nil {
-		return nil, err
-	}
-	var m manifest.Manifest
-	return m, json.Unmarshal(raw, &m)
 }

@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/json/v2"
 	"io"
 	"os"
 	"path/filepath"
@@ -18,7 +17,7 @@ func (s *WorkspaceService) Create(ctx context.Context, body io.Reader) (Workspac
 	}
 	defer os.RemoveAll(tmp)
 
-	filesDir := filepath.Join(tmp, "files")
+	filesDir := filepath.Join(tmp, filesDirName)
 	if err := os.Mkdir(filesDir, 0o755); err != nil {
 		return Workspace{}, err
 	}
@@ -28,15 +27,11 @@ func (s *WorkspaceService) Create(ctx context.Context, body io.Reader) (Workspac
 		return Workspace{}, err
 	}
 
-	raw, err := json.Marshal(m)
-	if err != nil {
-		return Workspace{}, err
-	}
-	if err := os.WriteFile(filepath.Join(tmp, "manifest.json"), raw, 0o644); err != nil {
+	if err := writeJSON(filepath.Join(tmp, manifestFile), m); err != nil {
 		return Workspace{}, err
 	}
 
-	if err := os.Rename(tmp, filepath.Join(s.dir, id.String())); err != nil {
+	if err := os.Rename(tmp, s.wsDir(id)); err != nil {
 		return Workspace{}, err
 	}
 

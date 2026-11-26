@@ -9,8 +9,6 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"path"
-	"path/filepath"
 	"slices"
 	"uuid"
 
@@ -22,8 +20,7 @@ func (s *WorkspaceService) PutBlob(ctx context.Context, id uuid.UUID, sum string
 		return 0, fmt.Errorf("%w: invalid sha256 %q", ErrInvalidInput, sum)
 	}
 
-	wsDir := filepath.Join(s.dir, id.String())
-	target, err := manifest.Load(filepath.Join(wsDir, "target.json"))
+	target, err := manifest.Load(s.targetPath(id))
 	if errors.Is(err, fs.ErrNotExist) {
 		return 0, fmt.Errorf("%w: workspace %s has no pending sync", ErrNotFound, id)
 	}
@@ -36,7 +33,7 @@ func (s *WorkspaceService) PutBlob(ctx context.Context, id uuid.UUID, sum string
 		return 0, fmt.Errorf("%w: blob %s was not requested", ErrInvalidInput, sum)
 	}
 
-	blob, err := s.receiveBlob(wsDir, sum, body)
+	blob, err := s.receiveBlob(s.wsDir(id), sum, body)
 	if err != nil {
 		return 0, err
 	}
@@ -53,7 +50,7 @@ func (s *WorkspaceService) PutBlob(ctx context.Context, id uuid.UUID, sum string
 		return 0, err
 	}
 
-	target, err = manifest.Load(filepath.Join(wsDir, "target.json"))
+	target, err = manifest.Load(s.targetPath(id))
 	if err != nil {
 		return 0, err
 	}
@@ -62,12 +59,12 @@ func (s *WorkspaceService) PutBlob(ctx context.Context, id uuid.UUID, sum string
 		return 0, fmt.Errorf("%w: blob %s is no longer requested", ErrInvalidInput, sum)
 	}
 
-	current, err := manifest.Load(filepath.Join(wsDir, "manifest.json"))
+	current, err := s.loadManifest(id)
 	if err != nil {
 		return 0, err
 	}
 
-	root, err := os.OpenRoot(filepath.Join(wsDir, "files"))
+	root, err := os.OpenRoot(s.filesDir(id))
 	if err != nil {
 		return 0, err
 	}
@@ -80,7 +77,7 @@ func (s *WorkspaceService) PutBlob(ctx context.Context, id uuid.UUID, sum string
 		current[p] = sum
 	}
 
-	if err := writeJSON(filepath.Join(wsDir, "manifest.json"), current); err != nil {
+	if err := writeJSON(s.manifestPath(id), current); err != nil {
 		return 0, err
 	}
 
@@ -130,38 +127,4 @@ func (s *WorkspaceService) receiveBlob(wsDir, sum string, body io.Reader) (strin
 		return "", err
 	}
 	return name, nil
-}
-
-func placeFile(root *os.Root, src, dst string) error {
-	if dir := path.Dir(dst); dir != "." {
-		if err := root.MkdirAll(dir, 0o755); err != nil {
-			return err
-		}
-	}
-
-	perm := os.FileMode(0o644)
-	if fi, err := root.Stat(dst); err == nil {
-		perm = fi.Mode().Perm()
-	}
-
-	in, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-
-	tmpName := path.Join(path.Dir(dst), ".rwe-tmp-"+path.Base(dst))
-	out, err := root.OpenFile(tmpName, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, perm)
-	if err != nil {
-		return err
-	}
-
-	_, copyErr := io.Copy(out, in)
-	closeErr := out.Close()
-	if err := errors.Join(copyErr, closeErr); err != nil {
-		root.Remove(tmpName)
-		return err
-	}
-
-	return root.Rename(tmpName, dst)
 }

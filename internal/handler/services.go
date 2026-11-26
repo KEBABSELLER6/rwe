@@ -8,7 +8,7 @@ import (
 	"uuid"
 )
 
-type FileService interface {
+type WorkspaceService interface {
 	Create(ctx context.Context, body io.Reader) (service.Workspace, error)
 	Sync(ctx context.Context, id uuid.UUID, body manifest.Manifest) ([]string, error)
 	PutBlob(ctx context.Context, id uuid.UUID, sum string, body io.Reader) (int, error)

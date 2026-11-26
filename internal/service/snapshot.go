@@ -1,13 +1,8 @@
 package service
 
 import (
-	"errors"
 	"fmt"
-	"io/fs"
-	"path/filepath"
 	"uuid"
-
-	"kebabseller6/rwe/internal/manifest"
 )
 
 func (s *WorkspaceService) Acquire(id uuid.UUID, expectedHash string) (filesDir string, err error) {
@@ -18,11 +13,7 @@ func (s *WorkspaceService) Acquire(id uuid.UUID, expectedHash string) (filesDir 
 		return "", err
 	}
 
-	wsDir := filepath.Join(s.dir, id.String())
-	current, err := manifest.Load(filepath.Join(wsDir, "manifest.json"))
-	if errors.Is(err, fs.ErrNotExist) {
-		return "", fmt.Errorf("%w: workspace %s", ErrNotFound, id)
-	}
+	current, err := s.loadManifest(id)
 	if err != nil {
 		return "", err
 	}
@@ -32,7 +23,7 @@ func (s *WorkspaceService) Acquire(id uuid.UUID, expectedHash string) (filesDir 
 	}
 
 	s.busy[id] = true
-	return filepath.Join(wsDir, "files"), nil
+	return s.filesDir(id), nil
 }
 
 func (s *WorkspaceService) Release(id uuid.UUID) {

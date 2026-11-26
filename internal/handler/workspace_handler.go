@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json/v2"
 	"fmt"
 	"kebabseller6/rwe/internal/manifest"
 	"kebabseller6/rwe/internal/service"
@@ -17,26 +16,26 @@ type SyncResponse struct {
 }
 
 type UploadResponse struct {
-	Remaning int `json:"remaining"`
+	Remaining int `json:"remaining"`
 }
 
-type WorkSpaceHandler struct {
-	s  FileService
+type WorkspaceHandler struct {
+	s  WorkspaceService
 	eh *ErrorHandler
 }
 
-func NewWorkspaceHandler(s FileService, eh *ErrorHandler) *WorkSpaceHandler {
-	return &WorkSpaceHandler{
+func NewWorkspaceHandler(s WorkspaceService, eh *ErrorHandler) *WorkspaceHandler {
+	return &WorkspaceHandler{
 		s:  s,
 		eh: eh,
 	}
 }
 
-func (h *WorkSpaceHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
+func (h *WorkspaceHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 20<<20)
 
-	if r.Header.Get("Content-Type") != "application/gzip" {
-		h.eh.HandleError(w, r, fmt.Errorf("%w: invalid content-type", service.ErrInvalidInput))
+	if err := requireContentType(r, "application/gzip"); err != nil {
+		h.eh.HandleError(w, r, err)
 		return
 	}
 
@@ -46,34 +45,25 @@ func (h *WorkSpaceHandler) HandleCreate(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.MarshalWrite(w, res)
+	writeJSON(w, http.StatusCreated, res)
 }
 
-func (h *WorkSpaceHandler) HandleSync(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, 4<<20)
-
-	if r.Header.Get("Content-Type") != "application/json" {
-		h.eh.HandleError(w, r, fmt.Errorf("%w: invalid content-type", service.ErrInvalidInput))
-		return
-	}
-
-	id, err := getId(r)
+func (h *WorkspaceHandler) HandleSync(w http.ResponseWriter, r *http.Request) {
+	var req SyncRequest
+	err := decodeJSON(w, r, 4<<20, &req)
 	if err != nil {
 		h.eh.HandleError(w, r, err)
 		return
 	}
 
-	var req SyncRequest
-	err = json.UnmarshalRead(r.Body, &req, json.RejectUnknownMembers(true))
+	id, err := pathID(r, "workspace")
 	if err != nil {
-		h.eh.HandleError(w, r, fmt.Errorf("%w: invalid json", service.ErrInvalidInput))
+		h.eh.HandleError(w, r, err)
 		return
 	}
 
 	if req.Files == nil {
-		h.eh.HandleError(w, r, fmt.Errorf("%w: empty target", service.ErrInvalidInput))
+		h.eh.HandleError(w, r, fmt.Errorf(`%w: "files" is required`, service.ErrInvalidInput))
 		return
 	}
 
@@ -82,22 +72,20 @@ func (h *WorkSpaceHandler) HandleSync(w http.ResponseWriter, r *http.Request) {
 		h.eh.HandleError(w, r, err)
 		return
 	}
-	res := SyncResponse{Missing: missing}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.MarshalWrite(w, res)
+	res := SyncResponse{Missing: missing}
+	writeJSON(w, http.StatusOK, res)
 }
 
-func (h *WorkSpaceHandler) HandleUpload(w http.ResponseWriter, r *http.Request) {
+func (h *WorkspaceHandler) HandleUpload(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 20<<20)
 
-	if r.Header.Get("Content-Type") != "application/octet-stream" {
-		h.eh.HandleError(w, r, fmt.Errorf("%w: invalid content-type", service.ErrInvalidInput))
+	if err := requireContentType(r, "application/octet-stream"); err != nil {
+		h.eh.HandleError(w, r, err)
 		return
 	}
 
-	id, err := getId(r)
+	id, err := pathID(r, "workspace")
 	if err != nil {
 		h.eh.HandleError(w, r, err)
 		return
@@ -114,13 +102,7 @@ func (h *WorkSpaceHandler) HandleUpload(w http.ResponseWriter, r *http.Request) 
 		h.eh.HandleError(w, r, err)
 		return
 	}
-	res := UploadResponse{Remaning: remaining}
-	if remaining > 0 {
-		w.WriteHeader(http.StatusNoContent)
-	} else {
-		w.WriteHeader(http.StatusCreated)
-	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.MarshalWrite(w, res)
+	res := UploadResponse{Remaining: remaining}
+	writeJSON(w, http.StatusOK, res)
 }

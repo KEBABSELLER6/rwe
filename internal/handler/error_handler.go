@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"encoding/json"
+	"encoding/json/v2"
 	"errors"
 	"kebabseller6/rwe/internal/service"
 	"log/slog"
@@ -20,33 +20,34 @@ type ErrorResponse struct {
 	Message string `json:"message"`
 }
 
-func buildError(w http.ResponseWriter, msg string, status int) {
-	w.Header().Set("Content-Type", "application/json")
-	resp := &ErrorResponse{Message: msg}
-	out, err := json.Marshal(resp)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(`{"message":"internal error"}`))
-		return
+func (h *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err error) {
+	status := statusFor(err)
+
+	msg := err.Error()
+	if status >= http.StatusInternalServerError {
+		msg = "internal error"
+		h.logger.ErrorContext(r.Context(), "request failed", "status", status, "err", err)
+	} else {
+		h.logger.WarnContext(r.Context(), "request rejected", "status", status, "err", err)
 	}
+
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	w.Write(out)
+	json.MarshalWrite(w, ErrorResponse{Message: msg})
 }
 
-func (h *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err error) {
-	h.logger.ErrorContext(r.Context(), "request failed", "err", err)
-
+func statusFor(err error) int {
 	var maxErr *http.MaxBytesError
 	switch {
 	case errors.As(err, &maxErr), errors.Is(err, service.ErrTooLarge):
-		buildError(w, "request too large", http.StatusRequestEntityTooLarge)
+		return http.StatusRequestEntityTooLarge
 	case errors.Is(err, service.ErrInvalidInput):
-		buildError(w, "invalid input", http.StatusBadRequest)
+		return http.StatusBadRequest
 	case errors.Is(err, service.ErrNotFound):
-		buildError(w, "not found", http.StatusNotFound)
+		return http.StatusNotFound
 	case errors.Is(err, service.ErrConflict):
-		buildError(w, "conflict", http.StatusConflict)
+		return http.StatusConflict
 	default:
-		buildError(w, "internal error", http.StatusInternalServerError)
+		return http.StatusInternalServerError
 	}
 }

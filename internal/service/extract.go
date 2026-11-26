@@ -11,20 +11,9 @@ import (
 	"io"
 	"os"
 	"path"
-	"path/filepath"
 
 	"kebabseller6/rwe/internal/manifest"
 )
-
-type Limits struct {
-	MaxTotalBytes int64
-	MaxFiles      int
-}
-
-var DefaultLimits = Limits{
-	MaxTotalBytes: 200 << 20,
-	MaxFiles:      20_000,
-}
 
 func extract(ctx context.Context, r io.Reader, dst string, lim Limits) (manifest.Manifest, error) {
 	zr, err := gzip.NewReader(r)
@@ -133,15 +122,4 @@ func writeFile(root *os.Root, name string, hdr *tar.Header, r io.Reader) (string
 	}
 
 	return hex.EncodeToString(h.Sum(nil)), nil
-}
-
-func cleanName(name string) (string, error) {
-	clean := path.Clean(name)
-	if clean == "." {
-		return ".", nil
-	}
-	if !filepath.IsLocal(filepath.FromSlash(clean)) {
-		return "", fmt.Errorf("%w: unsafe path %q", ErrInvalidInput, name)
-	}
-	return clean, nil
 }

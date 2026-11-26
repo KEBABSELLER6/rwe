@@ -30,21 +30,13 @@ type JobRequest struct {
 }
 
 func (h *JobHandler) HandleSubmit(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
-
-	if r.Header.Get("Content-Type") != "application/json" {
-		h.eh.HandleError(w, r, fmt.Errorf("%w: invalid content-type", service.ErrInvalidInput))
-		return
-	}
-
 	var jr JobRequest
-	err := json.UnmarshalRead(r.Body, &jr, json.RejectUnknownMembers(true))
-	if err != nil {
-		h.eh.HandleError(w, r, fmt.Errorf("%w: invalid json", service.ErrInvalidInput))
+	if err := decodeJSON(w, r, 64<<10, &jr); err != nil {
+		h.eh.HandleError(w, r, err)
 		return
 	}
 
-	id, err := getId(r)
+	id, err := pathID(r, "workspace")
 	if err != nil {
 		h.eh.HandleError(w, r, err)
 		return
@@ -66,13 +58,11 @@ func (h *JobHandler) HandleSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.MarshalWrite(w, j)
+	writeJSON(w, http.StatusCreated, j)
 }
 
 func (h *JobHandler) HandleGet(w http.ResponseWriter, r *http.Request) {
-	id, err := getId(r)
+	id, err := pathID(r, "job")
 	if err != nil {
 		h.eh.HandleError(w, r, err)
 		return
@@ -84,13 +74,11 @@ func (h *JobHandler) HandleGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.MarshalWrite(w, res)
+	writeJSON(w, http.StatusOK, res)
 }
 
 func (h *JobHandler) HandleLogs(w http.ResponseWriter, r *http.Request) {
-	id, err := getId(r)
+	id, err := pathID(r, "job")
 	if err != nil {
 		h.eh.HandleError(w, r, err)
 		return

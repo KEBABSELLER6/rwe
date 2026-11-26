@@ -2,21 +2,14 @@ package service
 
 import (
 	"context"
-	"encoding/json/v2"
-	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"path"
-	"path/filepath"
-	"regexp"
 	"slices"
 	"uuid"
 
 	"kebabseller6/rwe/internal/manifest"
 )
-
-var sha256Hex = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
 func (s *WorkspaceService) Sync(ctx context.Context, id uuid.UUID, want manifest.Manifest) ([]string, error) {
 	s.manifestMu.Lock()
@@ -26,12 +19,7 @@ func (s *WorkspaceService) Sync(ctx context.Context, id uuid.UUID, want manifest
 		return nil, err
 	}
 
-	wsDir := filepath.Join(s.dir, id.String())
-
-	current, err := manifest.Load(filepath.Join(wsDir, "manifest.json"))
-	if errors.Is(err, fs.ErrNotExist) {
-		return nil, fmt.Errorf("%w: workspace %s", ErrNotFound, id)
-	}
+	current, err := s.loadManifest(id)
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +28,7 @@ func (s *WorkspaceService) Sync(ctx context.Context, id uuid.UUID, want manifest
 		return nil, err
 	}
 
-	root, err := os.OpenRoot(filepath.Join(wsDir, "files"))
+	root, err := os.OpenRoot(s.filesDir(id))
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +44,7 @@ func (s *WorkspaceService) Sync(ctx context.Context, id uuid.UUID, want manifest
 		delete(current, p)
 	}
 
-	if err := writeJSON(filepath.Join(wsDir, "manifest.json"), current); err != nil {
+	if err := writeJSON(s.manifestPath(id), current); err != nil {
 		return nil, err
 	}
 
@@ -68,7 +56,7 @@ func (s *WorkspaceService) Sync(ctx context.Context, id uuid.UUID, want manifest
 	}
 	slices.Sort(missing)
 
-	if err := writeJSON(filepath.Join(wsDir, "target.json"), want); err != nil {
+	if err := writeJSON(s.targetPath(id), want); err != nil {
 		return nil, err
 	}
 
@@ -87,7 +75,7 @@ func validateManifest(m manifest.Manifest, lim Limits) error {
 		if clean != p || clean == "." {
 			return fmt.Errorf("%w: non-canonical path %q", ErrInvalidInput, p)
 		}
-		if !sha256Hex.MatchString(sum) {
+		if !manifest.Sha256Hex.MatchString(sum) {
 			return fmt.Errorf("%w: invalid sha256 for %q", ErrInvalidInput, p)
 		}
 		for dir := path.Dir(p); dir != "."; dir = path.Dir(dir) {
@@ -97,35 +85,4 @@ func validateManifest(m manifest.Manifest, lim Limits) error {
 		}
 	}
 	return nil
-}
-
-func removeWithEmptyParents(root *os.Root, p string) error {
-	if err := root.Remove(p); err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return err
-	}
-	for dir := path.Dir(p); dir != "."; dir = path.Dir(dir) {
-		if root.Remove(dir) != nil {
-			break
-		}
-	}
-	return nil
-}
-
-func writeJSON(name string, v any) error {
-	raw, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-	tmp, err := os.CreateTemp(filepath.Dir(name), ".tmp-*.json")
-	if err != nil {
-		return err
-	}
-	defer os.Remove(tmp.Name())
-
-	_, writeErr := tmp.Write(raw)
-	closeErr := tmp.Close()
-	if err := errors.Join(writeErr, closeErr); err != nil {
-		return err
-	}
-	return os.Rename(tmp.Name(), name)
 }
