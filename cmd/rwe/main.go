@@ -18,25 +18,6 @@ const usage = `usage:
   rwe run [-i IMAGE] [-t SECONDS] -- CMD...   sync the current dir and run CMD remotely
   rwe version`
 
-type config struct {
-	server string
-	image  string
-}
-
-func loadConfig() config {
-	return config{
-		server: envOr("RWE_URL", "http://localhost:8999"),
-		image:  envOr("RWE_IMAGE", "golang:1.27"),
-	}
-}
-
-func envOr(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return fallback
-}
-
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Fprintln(os.Stderr, usage)
@@ -46,20 +27,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	cfg := loadConfig()
-	var err error
-	code := 0
-	switch os.Args[1] {
-	case "mcp":
-		err = serveMCP(ctx, cfg)
-	case "run":
-		code, err = runCmd(ctx, cfg, os.Args[2:])
-	case "version":
-		fmt.Println(version)
-	default:
-		fmt.Fprintln(os.Stderr, usage)
-		code = 2
-	}
+	code, err := dispatch(ctx, os.Args[1], os.Args[2:])
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "rwe:", err)
 		code = 125
@@ -67,12 +35,13 @@ func main() {
 	os.Exit(code)
 }
 
-func runCmd(ctx context.Context, cfg config, args []string) (int, error) {
-	fs := flag.NewFlagSet("run", flag.ExitOnError)
-	image := fs.String("i", cfg.image, "container image")
-	timeout := fs.Int("t", 0, "timeout in seconds (0 = server default)")
-	fs.Parse(args)
-	if fs.NArg() == 0 {
+func dispatch(ctx context.Context, cmd string, args []string) (int, error) {
+	switch cmd {
+	case "version":
+		fmt.Println(version)
+		return 0, nil
+	case "mcp", "run":
+	default:
 		fmt.Fprintln(os.Stderr, usage)
 		return 2, nil
 	}
@@ -81,9 +50,29 @@ func runCmd(ctx context.Context, cfg config, args []string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+	cfg, err := loadConfig(dir)
+	if err != nil {
+		return 0, err
+	}
 
-	c := client.New(cfg.server)
-	job, err := c.Run(ctx, dir, client.JobSpec{Image: *image, Command: fs.Args(), TimeoutSeconds: *timeout}, func(line string) {
+	if cmd == "mcp" {
+		return 0, serveMCP(ctx, cfg)
+	}
+	return runCmd(ctx, cfg, args)
+}
+
+func runCmd(ctx context.Context, cfg config, args []string) (int, error) {
+	fs := flag.NewFlagSet("run", flag.ExitOnError)
+	image := fs.String("i", cfg.Image, "container image")
+	timeout := fs.Int("t", 0, "timeout in seconds (0 = server default)")
+	fs.Parse(args)
+	if fs.NArg() == 0 {
+		fmt.Fprintln(os.Stderr, usage)
+		return 2, nil
+	}
+
+	c := client.New(cfg.Server)
+	job, err := c.Run(ctx, cfg.dir, client.JobSpec{Image: *image, Command: fs.Args(), TimeoutSeconds: *timeout}, func(line string) {
 		fmt.Println(line)
 	})
 	if err != nil {

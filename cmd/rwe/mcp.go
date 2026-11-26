@@ -19,23 +19,19 @@ const (
 )
 
 func serveMCP(ctx context.Context, cfg config) error {
-	dir, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-	c := client.New(cfg.server)
+	c := client.New(cfg.Server)
 
 	run := mcp.Tool{
 		Name: "run",
 		Description: "Sync the current project to the remote rwe server and run a shell command there in a fresh container " +
-			"(default image " + cfg.image + "). Use it for builds and tests instead of running them locally. " +
+			"(default image " + cfg.Image + "). Use it for builds and tests instead of running them locally. " +
 			"Waits for the job and returns its status, exit code, duration and the last " + fmt.Sprint(tailLines) + " log lines; " +
 			"use the logs tool with the job id for the rest.",
 		InputSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
 				"command":         map[string]any{"type": "string", "description": "Shell command, run with sh -c in the project root, e.g. \"make test\""},
-				"image":           map[string]any{"type": "string", "description": "Container image, defaults to " + cfg.image},
+				"image":           map[string]any{"type": "string", "description": "Container image, defaults to " + cfg.Image},
 				"timeout_seconds": map[string]any{"type": "integer", "description": "Job timeout; omit for the server default"},
 			},
 			"required": []string{"command"},
@@ -53,12 +49,12 @@ func serveMCP(ctx context.Context, cfg config) error {
 				return "", errors.New("command is required")
 			}
 			if args.Image == "" {
-				args.Image = cfg.image
+				args.Image = cfg.Image
 			}
 
 			var tail lineTail
 			spec := client.JobSpec{Image: args.Image, Command: []string{"sh", "-c", args.Command}, TimeoutSeconds: args.TimeoutSeconds}
-			job, err := c.Run(ctx, dir, spec, tail.add)
+			job, err := c.Run(ctx, cfg.dir, spec, tail.add)
 			if err != nil {
 				return "", err
 			}
