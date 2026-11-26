@@ -1,0 +1,99 @@
+package client
+
+import (
+	"bufio"
+	"context"
+	"encoding/json/v2"
+	"fmt"
+	"net/http"
+	"strings"
+)
+
+type JobStatus string
+
+const (
+	JobPassed  JobStatus = "passed"
+	JobFailed  JobStatus = "failed"
+	JobTimeout JobStatus = "timeout"
+)
+
+type JobSpec struct {
+	Image          string   `json:"image"`
+	Command        []string `json:"command"`
+	TimeoutSeconds int      `json:"timeout_seconds,omitzero"`
+}
+
+type Job struct {
+	ID         string    `json:"id"`
+	Image      string    `json:"image"`
+	Command    []string  `json:"command"`
+	Status     JobStatus `json:"status"`
+	ExitCode   *int      `json:"exit_code"`
+	Error      string    `json:"error"`
+	DurationMS int64     `json:"duration_ms"`
+}
+
+func (c *Client) Run(ctx context.Context, dir string, spec JobSpec, emit func(line string)) (Job, error) {
+	synced, err := c.Sync(ctx, dir)
+	if err != nil {
+		return Job{}, fmt.Errorf("sync: %w", err)
+	}
+	job, err := c.Submit(ctx, synced, spec)
+	if err != nil {
+		return Job{}, err
+	}
+	return c.FollowLogs(ctx, job.ID, emit)
+}
+
+func (c *Client) Submit(ctx context.Context, synced Synced, spec JobSpec) (Job, error) {
+	body := struct {
+		ExpectedHash string `json:"expected_hash"`
+		JobSpec      `json:",inline"`
+	}{synced.Hash, spec}
+
+	var job Job
+	err := c.postJSON(ctx, "/workspaces/"+synced.WorkspaceID+"/jobs", body, &job)
+	return job, err
+}
+
+func (c *Client) Job(ctx context.Context, id string) (Job, error) {
+	var job Job
+	err := c.do(ctx, http.MethodGet, "/jobs/"+id, "", nil, &job)
+	return job, err
+}
+
+func (c *Client) FollowLogs(ctx context.Context, id string, emit func(line string)) (Job, error) {
+	resp, err := c.send(ctx, http.MethodGet, "/jobs/"+id+"/logs", "", nil)
+	if err != nil {
+		return Job{}, err
+	}
+	defer resp.Body.Close()
+
+	sc := bufio.NewScanner(resp.Body)
+	sc.Buffer(make([]byte, 64<<10), 16<<20)
+	event := ""
+	for sc.Scan() {
+		line := sc.Text()
+		switch {
+		case strings.HasPrefix(line, "event: "):
+			event = strings.TrimPrefix(line, "event: ")
+		case strings.HasPrefix(line, "data: ") && event == "done":
+			var job Job
+			if err := json.Unmarshal([]byte(strings.TrimPrefix(line, "data: ")), &job); err != nil {
+				return Job{}, fmt.Errorf("decode final job: %w", err)
+			}
+			return job, nil
+		case strings.HasPrefix(line, "data: "):
+			emit(strings.TrimPrefix(line, "data: "))
+		case line == "":
+			event = ""
+		}
+	}
+	if err := sc.Err(); err != nil {
+		return Job{}, fmt.Errorf("log stream: %w", err)
+	}
+	if err := ctx.Err(); err != nil {
+		return Job{}, err
+	}
+	return c.Job(ctx, id)
+}

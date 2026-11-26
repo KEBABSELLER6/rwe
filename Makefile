@@ -5,6 +5,7 @@ run:
 
 build:
 	go build -o bin/server ./cmd/server
+	go build -o bin/rwe ./cmd/rwe
 
 test:
 	go test -race ./...
