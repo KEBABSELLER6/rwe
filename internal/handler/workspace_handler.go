@@ -19,9 +19,14 @@ type SyncResponse struct {
 	Missing []string `json:"missing"`
 }
 
+type UploadResponse struct {
+	Remaning int `json:"remaining"`
+}
+
 type FileService interface {
 	Create(ctx context.Context, body io.Reader) (service.Workspace, error)
 	Sync(ctx context.Context, id uuid.UUID, body manifest.Manifest) ([]string, error)
+	PutBlob(ctx context.Context, id uuid.UUID, sum string, body io.Reader) (int, error)
 }
 
 type WorkSpaceHandler struct {
@@ -57,6 +62,7 @@ func (h *WorkSpaceHandler) HandleCreate(w http.ResponseWriter, r *http.Request) 
 
 func (h *WorkSpaceHandler) HandleSync(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 4<<20)
+	json.RejectUnknownMembers(true)
 
 	if r.Header.Get("Content-Type") != "application/json" {
 		h.eh.HandleError(w, r, fmt.Errorf("%w: invalid content-type", service.ErrInvalidInput))
@@ -77,6 +83,11 @@ func (h *WorkSpaceHandler) HandleSync(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.Files == nil {
+		h.eh.HandleError(w, r, fmt.Errorf("%w: empty target", service.ErrInvalidInput))
+		return
+	}
+
 	missing, err := h.s.Sync(r.Context(), id, req.Files)
 	if err != nil {
 		h.eh.HandleError(w, r, err)
@@ -86,5 +97,38 @@ func (h *WorkSpaceHandler) HandleSync(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
+	json.MarshalWrite(w, res)
+}
+
+func (h *WorkSpaceHandler) HandleUpload(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 20<<20)
+
+	if r.Header.Get("Content-Type") != "application/octet-stream" {
+		h.eh.HandleError(w, r, fmt.Errorf("%w: invalid content-type", service.ErrInvalidInput))
+		return
+	}
+
+	rawId := r.PathValue("id")
+	id, err := uuid.Parse(rawId)
+	if err != nil {
+		h.eh.HandleError(w, r, fmt.Errorf("%w: invalid workspace id", service.ErrInvalidInput))
+		return
+	}
+
+	hash := r.PathValue("sha256")
+	if !manifest.Sha256Hex.MatchString(hash) {
+		h.eh.HandleError(w, r, fmt.Errorf("%w: invalid hash", service.ErrInvalidInput))
+		return
+	}
+
+	remaining, err := h.s.PutBlob(r.Context(), id, hash, r.Body)
+	if err != nil {
+		h.eh.HandleError(w, r, err)
+		return
+	}
+	res := UploadResponse{Remaning: remaining}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
 	json.MarshalWrite(w, res)
 }

@@ -3,6 +3,7 @@ package service
 import (
 	"fmt"
 	"os"
+	"sync"
 	"uuid"
 )
 
@@ -12,8 +13,9 @@ type Workspace struct {
 }
 
 type WorkspaceService struct {
-	dir    string
-	limits Limits
+	dir        string
+	limits     Limits
+	manifestMu sync.Mutex
 }
 
 func NewWorkspaceService(dir string) (*WorkspaceService, error) {

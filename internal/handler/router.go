@@ -20,6 +20,7 @@ func NewRouter() (http.Handler, error) {
 
 	mux.HandleFunc("POST /workspaces", wspcHandler.HandleCreate)
 	mux.HandleFunc("POST /workspaces/{id}/sync", wspcHandler.HandleSync)
+	mux.HandleFunc("PUT /workspaces/{id}/blobs/{sha256}", wspcHandler.HandleUpload)
 
 	return mux, nil
 }

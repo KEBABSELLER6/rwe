@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"maps"
 	"os"
+	"regexp"
 	"slices"
 )
 
@@ -37,3 +38,5 @@ func Load(path string) (Manifest, error) {
 
 	return m, nil
 }
+
+var Sha256Hex = regexp.MustCompile(`^[0-9a-f]{64}$`)

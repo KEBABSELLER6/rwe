@@ -19,6 +19,9 @@ import (
 var sha256Hex = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
 func (s *WorkspaceService) Sync(ctx context.Context, id uuid.UUID, want manifest.Manifest) ([]string, error) {
+	s.manifestMu.Lock()
+	defer s.manifestMu.Unlock()
+
 	wsDir := filepath.Join(s.dir, id.String())
 
 	current, err := manifest.Load(filepath.Join(wsDir, "manifest.json"))
