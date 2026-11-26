@@ -5,12 +5,23 @@ import (
 	"encoding/json/v2"
 	"fmt"
 	"io"
+	"kebabseller6/rwe/internal/manifest"
 	"kebabseller6/rwe/internal/service"
 	"net/http"
+	"uuid"
 )
+
+type SyncRequest struct {
+	Files manifest.Manifest `json:"files"`
+}
+
+type SyncResponse struct {
+	Missing []string `json:"missing"`
+}
 
 type FileService interface {
 	Create(ctx context.Context, body io.Reader) (service.Workspace, error)
+	Sync(ctx context.Context, id uuid.UUID, body manifest.Manifest) ([]string, error)
 }
 
 type WorkSpaceHandler struct {
@@ -41,5 +52,39 @@ func (h *WorkSpaceHandler) HandleCreate(w http.ResponseWriter, r *http.Request) 
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
+	json.MarshalWrite(w, res)
+}
+
+func (h *WorkSpaceHandler) HandleSync(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 4<<20)
+
+	if r.Header.Get("Content-Type") != "application/json" {
+		h.eh.HandleError(w, r, fmt.Errorf("%w: invalid content-type", service.ErrInvalidInput))
+		return
+	}
+
+	rawId := r.PathValue("id")
+	id, err := uuid.Parse(rawId)
+	if err != nil {
+		h.eh.HandleError(w, r, fmt.Errorf("%w: invalid workspace id", service.ErrInvalidInput))
+		return
+	}
+
+	var req SyncRequest
+	err = json.UnmarshalRead(r.Body, &req)
+	if err != nil {
+		h.eh.HandleError(w, r, fmt.Errorf("%w: invalid json", service.ErrInvalidInput))
+		return
+	}
+
+	missing, err := h.s.Sync(r.Context(), id, req.Files)
+	if err != nil {
+		h.eh.HandleError(w, r, err)
+		return
+	}
+	res := SyncResponse{Missing: missing}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 	json.MarshalWrite(w, res)
 }

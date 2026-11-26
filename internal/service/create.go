@@ -3,29 +3,11 @@ package service
 import (
 	"context"
 	"encoding/json/v2"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"uuid"
 )
-
-type Workspace struct {
-	ID           uuid.UUID `json:"id"`
-	ManifestHash string    `json:"manifest_hash"`
-}
-
-type WorkspaceService struct {
-	dir    string
-	limits Limits
-}
-
-func NewWorkspaceService(dir string) (*WorkspaceService, error) {
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return nil, fmt.Errorf("create workspace dir: %w", err)
-	}
-	return &WorkspaceService{dir: dir, limits: DefaultLimits}, nil
-}
 
 func (s *WorkspaceService) Create(ctx context.Context, body io.Reader) (Workspace, error) {
 	id := uuid.NewV7()

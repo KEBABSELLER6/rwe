@@ -42,6 +42,8 @@ func (h *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err e
 		buildError(w, "request too large", http.StatusRequestEntityTooLarge)
 	case errors.Is(err, service.ErrInvalidInput):
 		buildError(w, "invalid input", http.StatusBadRequest)
+	case errors.Is(err, service.ErrNotFound):
+		buildError(w, "not found", http.StatusNotFound)
 	default:
 		buildError(w, "internal error", http.StatusInternalServerError)
 	}

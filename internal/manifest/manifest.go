@@ -3,7 +3,10 @@ package manifest
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json/v2"
+	"fmt"
 	"maps"
+	"os"
 	"slices"
 )
 
@@ -18,4 +21,19 @@ func (m Manifest) Hash() string {
 		h.Write([]byte{'\n'})
 	}
 	return hex.EncodeToString(h.Sum(nil))
+}
+
+func Load(path string) (Manifest, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	m := Manifest{}
+	err = json.Unmarshal(raw, &m)
+	if err != nil {
+		return nil, fmt.Errorf("corrupt manifest %s: %w", path, err)
+	}
+
+	return m, nil
 }
