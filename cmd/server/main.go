@@ -20,6 +20,8 @@ import (
 
 const shutdownTimeout = 30 * time.Second
 
+var version = "dev"
+
 func main() {
 	addr := flag.String("addr", ":8999", "listen address")
 	dataDir := flag.String("data", "local_data", "directory for workspaces and job logs")
@@ -67,7 +69,7 @@ func run(addr, dataDir string) error {
 
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- srv.Serve(ln) }()
-	logger.Info("server started", "addr", ln.Addr().String(), "data", dataDir)
+	logger.Info("server started", "version", version, "addr", ln.Addr().String(), "data", dataDir)
 
 	var runErr error
 	select {

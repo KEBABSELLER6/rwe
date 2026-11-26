@@ -76,4 +76,5 @@ workspace cleanup and a persistent job list.
 make test    # go test -race ./...
 make vet
 make smoke   # end-to-end checks against a running server (scripts/)
+make dist    # release binaries for linux amd64/arm64 + SHA256SUMS in dist/
 ```

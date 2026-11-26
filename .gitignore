@@ -1,3 +1,4 @@
 local_data/
 bin/
 .rwe/
+dist/
