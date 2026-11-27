@@ -95,13 +95,7 @@ func (h *WorkspaceHandler) HandleUpload(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	hash := r.PathValue("sha256")
-	if !manifest.Sha256Hex.MatchString(hash) {
-		h.eh.HandleError(w, r, fmt.Errorf("%w: invalid hash", service.ErrInvalidInput))
-		return
-	}
-
-	remaining, err := h.s.PutBlob(r.Context(), id, hash, r.Body)
+	remaining, err := h.s.PutBlob(r.Context(), id, r.PathValue("sha256"), r.Body)
 	if err != nil {
 		h.eh.HandleError(w, r, err)
 		return
