@@ -11,12 +11,6 @@ import (
 	"kebabseller6/rwe/internal/manifest"
 )
 
-type syncTarget struct {
-	Files      manifest.Manifest `json:"files"`
-	Sizes      map[string]int64  `json:"sizes"`
-	Executable []string          `json:"executable"`
-}
-
 func (s *WorkspaceService) Sync(ctx context.Context, id uuid.UUID, want manifest.Manifest, sizes map[string]int64, executable []string) ([]string, error) {
 	s.manifestMu.Lock()
 	defer s.manifestMu.Unlock()
@@ -137,19 +131,4 @@ func setExecutable(root *os.Root, name string, executable bool) error {
 		return nil
 	}
 	return root.Chmod(name, filePerm(executable))
-}
-
-func filePerm(executable bool) os.FileMode {
-	if executable {
-		return 0o755
-	}
-	return 0o644
-}
-
-func toSet(items []string) map[string]bool {
-	set := make(map[string]bool, len(items))
-	for _, item := range items {
-		set[item] = true
-	}
-	return set
 }

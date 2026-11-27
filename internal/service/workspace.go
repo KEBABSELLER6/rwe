@@ -34,6 +34,12 @@ type Workspace struct {
 	ManifestHash string    `json:"manifest_hash"`
 }
 
+type syncTarget struct {
+	Files      manifest.Manifest `json:"files"`
+	Sizes      map[string]int64  `json:"sizes"`
+	Executable []string          `json:"executable"`
+}
+
 type WorkspaceService struct {
 	dir        string
 	limits     Limits

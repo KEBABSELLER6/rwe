@@ -94,3 +94,18 @@ func forceRemoveAll(dir string) error {
 	})
 	return os.RemoveAll(dir)
 }
+
+func filePerm(executable bool) os.FileMode {
+	if executable {
+		return 0o755
+	}
+	return 0o644
+}
+
+func toSet(items []string) map[string]bool {
+	set := make(map[string]bool, len(items))
+	for _, item := range items {
+		set[item] = true
+	}
+	return set
+}
