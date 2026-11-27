@@ -86,3 +86,16 @@ func placeFile(root *os.Root, src, dst string) error {
 
 	return root.Rename(tmpName, dst)
 }
+
+func forceRemoveAll(dir string) error {
+	if err := os.RemoveAll(dir); err == nil {
+		return nil
+	}
+	filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
+		if err == nil && d.IsDir() {
+			os.Chmod(p, 0o700)
+		}
+		return nil
+	})
+	return os.RemoveAll(dir)
+}

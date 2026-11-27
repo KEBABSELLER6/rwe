@@ -224,6 +224,36 @@ func TestJob_RunsOnCopyOfWorkspace(t *testing.T) {
 	waitFinished(t, env.jobs, next.ID)
 }
 
+func TestJob_RemovesReadOnlyCopy(t *testing.T) {
+	var jobFiles string
+	env := newJobEnv(t, func(_ context.Context, spec RunSpec, _ io.Writer) (int, error) {
+		jobFiles = spec.FilesDir
+		locked := filepath.Join(spec.FilesDir, "locked", "inner")
+		if err := os.MkdirAll(locked, 0o755); err != nil {
+			return -1, err
+		}
+		if err := os.WriteFile(filepath.Join(locked, "f"), nil, 0o644); err != nil {
+			return -1, err
+		}
+		for _, dir := range []string{locked, filepath.Dir(locked)} {
+			if err := os.Chmod(dir, 0o500); err != nil {
+				return -1, err
+			}
+		}
+		return 0, os.Chmod(spec.FilesDir, 0o000)
+	})
+
+	job, err := env.jobs.Submit(env.request())
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFinished(t, env.jobs, job.ID)
+
+	if _, err := os.Lstat(jobFiles); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("read-only job copy %s not removed: %v", jobFiles, err)
+	}
+}
+
 func TestJob_SubmitRejects(t *testing.T) {
 	env := newJobEnv(t, exitWith(0, nil, ""))
 
