@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"io"
 	"log/slog"
@@ -105,6 +106,32 @@ func TestSyncUploadsOnlyChanges(t *testing.T) {
 	if second.WorkspaceID != first.WorkspaceID || second.Uploaded != 1 || second.Files != 3 {
 		t.Fatalf("second sync = %+v, want same workspace, one deduplicated upload, 3 files", second)
 	}
+}
+
+func TestSyncFilesOver20MiB(t *testing.T) {
+	c := newTestClient(t)
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{"big.bin": string(randomBytes(t, 21<<20))})
+
+	if _, err := c.Sync(t.Context(), dir); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	writeFiles(t, dir, map[string]string{"big.bin": string(randomBytes(t, 21<<20))})
+	synced, err := c.Sync(t.Context(), dir)
+	if err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	if synced.Uploaded != 1 {
+		t.Fatalf("sync = %+v, want the big file uploaded", synced)
+	}
+}
+
+func randomBytes(t *testing.T, n int) []byte {
+	t.Helper()
+	b := make([]byte, n)
+	rand.Read(b)
+	return b
 }
 
 func TestSyncRecreatesUnknownWorkspace(t *testing.T) {
