@@ -54,6 +54,7 @@ type JobLimits struct {
 	DefaultTimeout time.Duration
 	MaxTimeout     time.Duration
 	QueueSize      int
+	MaxMemory      int64
 }
 
 var DefaultJobLimits = JobLimits{
@@ -78,7 +79,7 @@ type JobService struct {
 	jobs map[uuid.UUID]*Job
 }
 
-func NewJobService(dir string, workspaces WorkspaceLocker, runner Runner) (*JobService, error) {
+func NewJobService(dir string, workspaces WorkspaceLocker, runner Runner, limits JobLimits) (*JobService, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, fmt.Errorf("create jobs dir: %w", err)
 	}
@@ -86,8 +87,8 @@ func NewJobService(dir string, workspaces WorkspaceLocker, runner Runner) (*JobS
 		dir:        dir,
 		workspaces: workspaces,
 		runner:     runner,
-		limits:     DefaultJobLimits,
-		queue:      make(chan uuid.UUID, DefaultJobLimits.QueueSize),
+		limits:     limits,
+		queue:      make(chan uuid.UUID, limits.QueueSize),
 		jobs:       map[uuid.UUID]*Job{},
 	}, nil
 }

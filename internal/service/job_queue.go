@@ -62,9 +62,14 @@ func (s *JobService) validate(req *JobRequest) error {
 		return fmt.Errorf("%w: timeout must be between 0 and %s", ErrInvalidInput, s.limits.MaxTimeout)
 	case req.Memory < 0 || req.CPUs < 0:
 		return fmt.Errorf("%w: limits must not be negative", ErrInvalidInput)
+	case s.limits.MaxMemory > 0 && req.Memory > s.limits.MaxMemory:
+		return fmt.Errorf("%w: memory must not exceed %d bytes", ErrInvalidInput, s.limits.MaxMemory)
 	}
 	if req.Timeout == 0 {
 		req.Timeout = s.limits.DefaultTimeout
+	}
+	if req.Memory == 0 {
+		req.Memory = s.limits.MaxMemory
 	}
 	return nil
 }

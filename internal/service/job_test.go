@@ -50,7 +50,7 @@ func newJobEnv(t *testing.T, run func(context.Context, RunSpec, io.Writer) (int,
 	}
 
 	runner := &fakeRunner{run: run}
-	jobs, err := NewJobService(t.TempDir(), ws, runner)
+	jobs, err := NewJobService(t.TempDir(), ws, runner, DefaultJobLimits)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -256,7 +256,7 @@ func TestJob_SubmitRejects(t *testing.T) {
 }
 
 func TestJob_QueueFull(t *testing.T) {
-	jobs, err := NewJobService(t.TempDir(), nil, nil)
+	jobs, err := NewJobService(t.TempDir(), nil, nil, DefaultJobLimits)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -358,5 +358,25 @@ func TestJob_FollowLogsOfFinishedJob(t *testing.T) {
 
 	if err := env.jobs.FollowLogs(t.Context(), uuid.NewV7(), nil); !errors.Is(err, ErrNotFound) {
 		t.Errorf("unknown job: err = %v, want ErrNotFound", err)
+	}
+}
+
+func TestJob_MaxMemory(t *testing.T) {
+	env := newJobEnv(t, exitWith(0, nil, ""))
+	env.jobs.limits.MaxMemory = 2 << 30
+
+	job, err := env.jobs.Submit(env.request())
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFinished(t, env.jobs, job.ID)
+	if got := env.runner.specs[0].Memory; got != 2<<30 {
+		t.Errorf("memory = %d, want the server cap as default", got)
+	}
+
+	req := env.request()
+	req.Memory = 3 << 30
+	if _, err := env.jobs.Submit(req); !errors.Is(err, ErrInvalidInput) {
+		t.Errorf("over cap: err = %v, want ErrInvalidInput", err)
 	}
 }
