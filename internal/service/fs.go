@@ -53,16 +53,11 @@ func writeJSON(name string, v any) error {
 	return os.Rename(tmp.Name(), name)
 }
 
-func placeFile(root *os.Root, src, dst string) error {
+func placeFile(root *os.Root, src, dst string, perm os.FileMode) error {
 	if dir := path.Dir(dst); dir != "." {
 		if err := root.MkdirAll(dir, 0o755); err != nil {
 			return err
 		}
-	}
-
-	perm := os.FileMode(0o644)
-	if fi, err := root.Stat(dst); err == nil {
-		perm = fi.Mode().Perm()
 	}
 
 	in, err := os.Open(src)

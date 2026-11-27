@@ -26,7 +26,7 @@ func (c *Client) Sync(ctx context.Context, dir string) (Synced, error) {
 	if err != nil {
 		return Synced{}, err
 	}
-	m, sizes, err := BuildManifest(dir, files)
+	tree, err := BuildManifest(dir, files)
 	if err != nil {
 		return Synced{}, err
 	}
@@ -41,23 +41,23 @@ func (c *Client) Sync(ctx context.Context, dir string) (Synced, error) {
 		}
 	}
 
-	missing, err := c.syncManifest(ctx, id, m, sizes)
+	missing, err := c.syncManifest(ctx, id, tree)
 	if isStatus(err, http.StatusNotFound) {
 		if id, err = c.createWorkspace(ctx, dir, files); err != nil {
 			return Synced{}, err
 		}
-		missing, err = c.syncManifest(ctx, id, m, sizes)
+		missing, err = c.syncManifest(ctx, id, tree)
 	}
 	if err != nil {
 		return Synced{}, err
 	}
 
-	uploaded, err := c.uploadMissing(ctx, dir, id, m, missing)
+	uploaded, err := c.uploadMissing(ctx, dir, id, tree.Files, missing)
 	if err != nil {
 		return Synced{}, err
 	}
 
-	return Synced{WorkspaceID: id, Hash: m.Hash(), Files: len(m), Uploaded: uploaded}, nil
+	return Synced{WorkspaceID: id, Hash: tree.Files.Hash(), Files: len(tree.Files), Uploaded: uploaded}, nil
 }
 
 func (c *Client) createWorkspace(ctx context.Context, dir string, files []string) (string, error) {
@@ -77,11 +77,11 @@ func (c *Client) createWorkspace(ctx context.Context, dir string, files []string
 	return res.ID, nil
 }
 
-func (c *Client) syncManifest(ctx context.Context, id string, m manifest.Manifest, sizes map[string]int64) ([]string, error) {
+func (c *Client) syncManifest(ctx context.Context, id string, tree Tree) ([]string, error) {
 	var res struct {
 		Missing []string `json:"missing"`
 	}
-	err := c.postJSON(ctx, "/workspaces/"+id+"/sync", map[string]any{"files": m, "sizes": sizes}, &res)
+	err := c.postJSON(ctx, "/workspaces/"+id+"/sync", map[string]any{"files": tree.Files, "sizes": tree.Sizes, "executable": tree.Executable}, &res)
 	return res.Missing, err
 }
 

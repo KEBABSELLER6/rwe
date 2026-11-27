@@ -76,33 +76,45 @@ func walkFiles(dir string) ([]string, error) {
 	return files, err
 }
 
-func BuildManifest(dir string, files []string) (manifest.Manifest, map[string]int64, error) {
-	m := manifest.Manifest{}
-	sizes := map[string]int64{}
-	for _, f := range files {
-		sum, size, err := hashFile(filepath.Join(dir, f))
-		if err != nil {
-			return nil, nil, err
-		}
-		m[f] = sum
-		sizes[f] = size
-	}
-	return m, sizes, nil
+type Tree struct {
+	Files      manifest.Manifest
+	Sizes      map[string]int64
+	Executable []string
 }
 
-func hashFile(path string) (string, int64, error) {
+func BuildManifest(dir string, files []string) (Tree, error) {
+	tree := Tree{Files: manifest.Manifest{}, Sizes: map[string]int64{}, Executable: []string{}}
+	for _, f := range files {
+		sum, size, executable, err := hashFile(filepath.Join(dir, f))
+		if err != nil {
+			return Tree{}, err
+		}
+		tree.Files[f] = sum
+		tree.Sizes[f] = size
+		if executable {
+			tree.Executable = append(tree.Executable, f)
+		}
+	}
+	return tree, nil
+}
+
+func hashFile(path string) (sum string, size int64, executable bool, err error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return "", 0, err
+		return "", 0, false, err
 	}
 	defer f.Close()
 
+	info, err := f.Stat()
+	if err != nil {
+		return "", 0, false, err
+	}
 	h := sha256.New()
 	n, err := io.Copy(h, f)
 	if err != nil {
-		return "", 0, err
+		return "", 0, false, err
 	}
-	return hex.EncodeToString(h.Sum(nil)), n, nil
+	return hex.EncodeToString(h.Sum(nil)), n, info.Mode()&0o111 != 0, nil
 }
 
 func writeTarball(w io.Writer, dir string, files []string) error {

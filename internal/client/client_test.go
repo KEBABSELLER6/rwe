@@ -218,3 +218,22 @@ func TestListFilesSkipsStateAndSymlinks(t *testing.T) {
 		t.Fatalf("files = %s", got)
 	}
 }
+
+func TestBuildManifestMarksExecutables(t *testing.T) {
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{"run.sh": "#!/bin/sh", "notes.txt": "hi"})
+	if err := os.Chmod(filepath.Join(dir, "run.sh"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	tree, err := BuildManifest(dir, []string{"notes.txt", "run.sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(tree.Executable, []string{"run.sh"}) {
+		t.Errorf("executable = %v, want [run.sh]", tree.Executable)
+	}
+	if tree.Sizes["run.sh"] != 9 || tree.Sizes["notes.txt"] != 2 {
+		t.Errorf("sizes = %v", tree.Sizes)
+	}
+}

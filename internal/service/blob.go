@@ -76,8 +76,9 @@ func (s *WorkspaceService) PutBlob(ctx context.Context, id uuid.UUID, sum string
 	}
 	defer root.Close()
 
+	isExec := toSet(target.Executable)
 	for _, p := range paths {
-		if err := placeFile(root, blob, p); err != nil {
+		if err := placeFile(root, blob, p, filePerm(isExec[p])); err != nil {
 			return 0, fmt.Errorf("place %q: %w", p, err)
 		}
 		current[p] = sum

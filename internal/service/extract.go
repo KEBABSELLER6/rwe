@@ -97,12 +97,7 @@ func writeFile(root *os.Root, name string, hdr *tar.Header, r io.Reader) (string
 		}
 	}
 
-	perm := os.FileMode(0o644)
-	if hdr.Mode&0o111 != 0 {
-		perm = 0o755
-	}
-
-	f, err := root.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, perm)
+	f, err := root.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, filePerm(hdr.Mode&0o111 != 0))
 	if err != nil {
 		if errors.Is(err, os.ErrExist) {
 			return "", fmt.Errorf("%w: duplicate entry %q", ErrInvalidInput, name)
