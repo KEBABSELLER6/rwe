@@ -58,7 +58,7 @@ Works today:
 - `rwe run` CLI with the job's exit code (124 timeout, 125 infrastructure error)
 - `rwe mcp` with `run` and `logs` tools
 - User and project config files, env overrides
-- Cache directories kept between jobs (`caches` in `.rwe.json`)
+- Cache directories kept between jobs (`caches` in `.rwe.json`); see [BENCHMARKS.md](BENCHMARKS.md)
 
 Known limits:
 

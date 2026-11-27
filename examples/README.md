@@ -14,8 +14,10 @@ The files here are the parts that differ per machine or per project.
 Per project you also want a `.rwe.json`, like the one at this repo's root:
 
 ```json
-{ "image": "golang:1.27" }
+{ "image": "golang:1.27", "caches": ["/tmp/.cache/go-build"] }
 ```
+
+See [Caches](#caches) for ready-made ones per stack.
 
 ## Setup
 
@@ -32,19 +34,6 @@ Later wins: built-in defaults (`http://localhost:8999`, `golang:1.27`) →
 `~/.config/rwe/config.json` → `<project>/.rwe.json` → `RWE_URL` / `RWE_IMAGE` → `rwe run -i IMAGE`.
 Both files accept `server`, `image` and `caches`; unknown keys are an error.
 
-## Caches
-
-`caches` lists container paths that are kept between jobs, so installs and builds start warm.
-Jobs run as the server's user with `HOME=/tmp`, so tool caches live under `/tmp`:
-
-```json
-{ "image": "oven/bun:1", "caches": ["/tmp/.bun/install/cache", "/workspace/node_modules"] }
-```
-
-A path under `/workspace` is kept per workspace (one `node_modules` per project). Any other path
-is shared by every job on the server, which suits download and build caches. They live in
-`<data>/caches`; delete that directory to start cold again.
-
 The server has no config file: `-addr` / `-data` flags, defaulting to `RWE_ADDR` / `RWE_DATA`,
 then `:8999` / `local_data`. `RWE_JOB_MEMORY` (or `-job-memory`, e.g. `2g`) caps each job's memory:
 it is the default for jobs that set none, and a job asking for more is rejected. Unset means no cap.
@@ -52,3 +41,21 @@ it is the default for jobs that set none, and a job asking for more is rejected.
 finished; its status stays available. `0` keeps logs forever.
 Under systemd, load the env file with
 `EnvironmentFile=/etc/rwe/server.env`; `systemctl restart rwe` picks up changes.
+
+## Caches
+
+`caches` lists container paths that are kept between jobs, so installs and builds start warm.
+Jobs run as the server's user with `HOME=/tmp`, so tool caches usually live under `/tmp`.
+
+- A path under `/workspace` is kept per workspace, e.g. `/workspace/node_modules`.
+- Any other path is shared by every job on the server, which suits download and build caches.
+- Docker creates missing parent directories of a cache path as root, and the job can't write
+  there. If a tool also writes next to its cache, cache the parent instead (Go: `/go/pkg`, not
+  `/go/pkg/mod`).
+- They live in `<data>/caches` on the box; delete that directory to start cold again.
+
+Tested setups, with timings in [BENCHMARKS.md](../BENCHMARKS.md):
+
+| Stack | Example |
+|---|---|
+| Go | [`go/`](go/) |
