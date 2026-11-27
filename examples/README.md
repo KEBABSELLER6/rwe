@@ -9,6 +9,7 @@ The files here are the parts that differ per machine or per project.
 | [`config.json`](config.json) | `~/.config/rwe/config.json` | Which server to talk to |
 | [`.mcp.json`](.mcp.json) | `<project>/.mcp.json` | Registers `rwe mcp` with Claude Code for that project |
 | [`AGENTS.md`](AGENTS.md) | paste into `<project>/CLAUDE.md` or `AGENTS.md` | Tells the agent to verify remotely instead of locally |
+| [`server.env`](server.env) | `/etc/rwe/server.env` on the box | Server listen address and data directory |
 
 Per project you also want a `.rwe.json`, like the one at this repo's root:
 
@@ -30,3 +31,7 @@ Per project you also want a `.rwe.json`, like the one at this repo's root:
 Later wins: built-in defaults (`http://localhost:8999`, `golang:1.27`) →
 `~/.config/rwe/config.json` → `<project>/.rwe.json` → `RWE_URL` / `RWE_IMAGE` → `rwe run -i IMAGE`.
 Both files accept `server` and `image`; unknown keys are an error.
+
+The server has no config file: `-addr` / `-data` flags, defaulting to `RWE_ADDR` / `RWE_DATA`,
+then `:8999` / `local_data`. Under systemd, load the env file with
+`EnvironmentFile=/etc/rwe/server.env`; `systemctl restart rwe` picks up changes.

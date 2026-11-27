@@ -23,14 +23,21 @@ const shutdownTimeout = 30 * time.Second
 var version = "dev"
 
 func main() {
-	addr := flag.String("addr", ":8999", "listen address")
-	dataDir := flag.String("data", "local_data", "directory for workspaces and job logs")
+	addr := flag.String("addr", envOr("RWE_ADDR", ":8999"), "listen address (env RWE_ADDR)")
+	dataDir := flag.String("data", envOr("RWE_DATA", "local_data"), "directory for workspaces and job logs (env RWE_DATA)")
 	flag.Parse()
 
 	if err := run(*addr, *dataDir); err != nil {
 		slog.Error("application stopped", "err", err)
 		os.Exit(1)
 	}
+}
+
+func envOr(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
 }
 
 func run(addr, dataDir string) error {
