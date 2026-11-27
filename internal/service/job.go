@@ -92,14 +92,18 @@ func NewJobService(dir string, workspaces WorkspaceLocker, runner Runner, limits
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, fmt.Errorf("create jobs dir: %w", err)
 	}
-	return &JobService{
+	s := &JobService{
 		dir:        dir,
 		workspaces: workspaces,
 		runner:     runner,
 		limits:     limits,
 		queue:      make(chan uuid.UUID, limits.QueueSize),
 		jobs:       map[uuid.UUID]*Job{},
-	}, nil
+	}
+	if err := s.load(); err != nil {
+		return nil, err
+	}
+	return s, nil
 }
 
 func (s *JobService) Get(id uuid.UUID) (Job, error) {
@@ -161,6 +165,7 @@ func (s *JobService) Cancel(id uuid.UUID) (Job, error) {
 	case JobQueued:
 		job.Status = JobCancelled
 		job.FinishedAt = time.Now()
+		s.saveOrWarn(job)
 		s.workspaces.Release(job.WorkspaceID)
 	case JobRunning:
 		job.cancel(errCancelled)
@@ -217,6 +222,11 @@ func (s *JobService) newJob(req JobRequest, filesDir string) (Job, error) {
 			Memory:   req.Memory,
 			CPUs:     req.CPUs,
 		},
+	}
+
+	if err := s.save(job); err != nil {
+		forceRemoveAll(filepath.Dir(s.logPath(id)))
+		return Job{}, err
 	}
 
 	s.mu.Lock()

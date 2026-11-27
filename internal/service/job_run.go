@@ -34,6 +34,7 @@ func (s *JobService) run(ctx context.Context, id uuid.UUID) {
 	job.StartedAt = time.Now()
 	job.cancel = cancel
 	spec := job.spec
+	s.saveOrWarn(job)
 	s.mu.Unlock()
 
 	code, err := s.runOnCopy(ctx, id, spec)
@@ -41,6 +42,7 @@ func (s *JobService) run(ctx context.Context, id uuid.UUID) {
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	defer s.saveOrWarn(job)
 	job.FinishedAt = time.Now()
 	job.DurationMS = job.FinishedAt.Sub(job.StartedAt).Milliseconds()
 	switch {
