@@ -64,12 +64,14 @@ type JobLimits struct {
 	MaxTimeout     time.Duration
 	QueueSize      int
 	MaxMemory      int64
+	LogRetention   time.Duration
 }
 
 var DefaultJobLimits = JobLimits{
 	DefaultTimeout: 10 * time.Minute,
 	MaxTimeout:     time.Hour,
 	QueueSize:      16,
+	LogRetention:   7 * 24 * time.Hour,
 }
 
 type WorkspaceLocker interface {

@@ -35,5 +35,7 @@ Both files accept `server` and `image`; unknown keys are an error.
 The server has no config file: `-addr` / `-data` flags, defaulting to `RWE_ADDR` / `RWE_DATA`,
 then `:8999` / `local_data`. `RWE_JOB_MEMORY` (or `-job-memory`, e.g. `2g`) caps each job's memory:
 it is the default for jobs that set none, and a job asking for more is rejected. Unset means no cap.
+`RWE_LOG_RETENTION` (or `-log-retention`, default `168h`) deletes a job's log that long after it
+finished; its status stays available. `0` keeps logs forever.
 Under systemd, load the env file with
 `EnvironmentFile=/etc/rwe/server.env`; `systemctl restart rwe` picks up changes.
