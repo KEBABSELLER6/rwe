@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json/v2"
 	"errors"
 	"kebabseller6/rwe/internal/service"
 	"log/slog"
@@ -31,9 +30,7 @@ func (h *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err e
 		h.logger.WarnContext(r.Context(), "request rejected", "status", status, "err", err)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.MarshalWrite(w, ErrorResponse{Message: msg})
+	writeJSON(w, status, ErrorResponse{Message: msg})
 }
 
 func statusFor(err error) int {
