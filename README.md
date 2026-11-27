@@ -66,7 +66,6 @@ Known limits:
 - Job logs are deleted 7 days after the job finishes (`RWE_LOG_RETENTION`); the job status is kept forever.
 - A sync with a running job gets 409: one job per workspace at a time.
 - Only the exec bit of a file is synced, not its full mode (files are 0644 or 0755).
-- A command that exits with 125 is reported as a docker failure, since docker uses that code for its own errors.
 - Nothing comes back but the log: no artifacts yet.
 - Caches are never cleaned up by the server; delete `<data>/caches` to reset them.
 

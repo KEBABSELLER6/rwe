@@ -2,6 +2,7 @@ package runner
 
 import (
 	"context"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"io"
@@ -9,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"kebabseller6/rwe/internal/service"
@@ -46,17 +48,17 @@ func (d *Docker) Run(ctx context.Context, spec service.RunSpec, logs io.Writer) 
 	if err := cmd.Start(); err != nil {
 		return -1, fmt.Errorf("start docker: %w", err)
 	}
+	defer d.remove(spec.Name)
 
 	done := make(chan error, 1)
 	go func() { done <- cmd.Wait() }()
 
 	select {
 	case err := <-done:
-		return exitCode(err)
+		return d.exitCode(spec.Name, err)
 	case <-ctx.Done():
 		cmd.Process.Kill()
 		<-done
-		d.remove(spec.Name)
 		return -1, fmt.Errorf("job %s stopped: %w", spec.Name, ctx.Err())
 	}
 }
@@ -71,7 +73,7 @@ func runArgs(spec service.RunSpec) ([]string, error) {
 	}
 
 	args := []string{
-		"run", "--rm",
+		"run",
 		"--name", spec.Name,
 		"--init",
 		"--user", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()),
@@ -98,7 +100,7 @@ func runArgs(spec service.RunSpec) ([]string, error) {
 	return append(args, spec.Command...), nil
 }
 
-func exitCode(err error) (int, error) {
+func (d *Docker) exitCode(name string, err error) (int, error) {
 	if err == nil {
 		return 0, nil
 	}
@@ -109,7 +111,27 @@ func exitCode(err error) (int, error) {
 	if code := exitErr.ExitCode(); code != dockerErrorCode {
 		return code, nil
 	}
+	if d.ranToExit(name) {
+		return dockerErrorCode, nil
+	}
 	return -1, errors.New("docker failed to run the container (exit 125), see job log")
+}
+
+func (d *Docker) ranToExit(name string) bool {
+	out, err := exec.Command(d.binary, "inspect", "--format", "{{json .State}}", name).Output()
+	if err != nil {
+		return false
+	}
+	var state struct {
+		StartedAt string
+		ExitCode  int
+		Error     string
+	}
+	if json.Unmarshal(out, &state) != nil {
+		return false
+	}
+	started := state.StartedAt != "" && !strings.HasPrefix(state.StartedAt, "0001-01-01")
+	return started && state.Error == "" && state.ExitCode == dockerErrorCode
 }
 
 func (d *Docker) remove(name string) {
