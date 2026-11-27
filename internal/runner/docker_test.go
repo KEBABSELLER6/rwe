@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -144,17 +145,30 @@ func TestDocker_CachesAreWritableAndKept(t *testing.T) {
 	}
 }
 
-func TestDocker_CommandExit125IsNotDockerError(t *testing.T) {
+func TestDocker_CommandExitCodesDockerAlsoUses(t *testing.T) {
 	requireDocker(t)
-	s := spec(t.TempDir(), "sh", "-c", "exit 125")
+	for _, want := range []int{125, 126, 127} {
+		s := spec(t.TempDir(), "sh", "-c", fmt.Sprintf("exit %d", want))
+
+		var logs bytes.Buffer
+		code, err := NewDocker().Run(t.Context(), s, &logs)
+		if err != nil || code != want {
+			t.Errorf("Run = %d, %v; want %d, nil\nlogs:\n%s", code, err, want, logs.String())
+		}
+		if exec.Command("docker", "inspect", s.Name).Run() == nil {
+			t.Errorf("container %s still exists", s.Name)
+		}
+	}
+}
+
+func TestDocker_MissingCommandIsExit127(t *testing.T) {
+	requireDocker(t)
+	s := spec(t.TempDir(), "/does-not-exist")
 
 	var logs bytes.Buffer
 	code, err := NewDocker().Run(t.Context(), s, &logs)
-	if err != nil || code != 125 {
-		t.Fatalf("Run = %d, %v; want 125, nil\nlogs:\n%s", code, err, logs.String())
-	}
-	if exec.Command("docker", "inspect", s.Name).Run() == nil {
-		t.Errorf("container %s still exists", s.Name)
+	if err != nil || code != 127 {
+		t.Fatalf("Run = %d, %v; want 127, nil like a shell\nlogs:\n%s", code, err, logs.String())
 	}
 }
 

@@ -17,9 +17,8 @@ import (
 )
 
 const (
-	pidsLimit       = "1024"
-	dockerErrorCode = 125
-	removeTimeout   = 30 * time.Second
+	pidsLimit     = "1024"
+	removeTimeout = 30 * time.Second
 )
 
 type Docker struct {
@@ -108,16 +107,18 @@ func (d *Docker) exitCode(name string, err error) (int, error) {
 	if !errors.As(err, &exitErr) {
 		return -1, err
 	}
-	if code := exitErr.ExitCode(); code != dockerErrorCode {
+	code := exitErr.ExitCode()
+	if !dockerOwnCode(code) || d.ranToExit(name, code) {
 		return code, nil
 	}
-	if d.ranToExit(name) {
-		return dockerErrorCode, nil
-	}
-	return -1, errors.New("docker failed to run the container (exit 125), see job log")
+	return -1, fmt.Errorf("docker failed to run the container (exit %d), see job log", code)
 }
 
-func (d *Docker) ranToExit(name string) bool {
+func dockerOwnCode(code int) bool {
+	return code == 125 || code == 126 || code == 127
+}
+
+func (d *Docker) ranToExit(name string, code int) bool {
 	out, err := exec.Command(d.binary, "inspect", "--format", "{{json .State}}", name).Output()
 	if err != nil {
 		return false
@@ -131,7 +132,7 @@ func (d *Docker) ranToExit(name string) bool {
 		return false
 	}
 	started := state.StartedAt != "" && !strings.HasPrefix(state.StartedAt, "0001-01-01")
-	return started && state.Error == "" && state.ExitCode == dockerErrorCode
+	return started && state.Error == "" && state.ExitCode == code
 }
 
 func (d *Docker) remove(name string) {
