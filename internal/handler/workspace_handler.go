@@ -1,0 +1,108 @@
+package handler
+
+import (
+	"fmt"
+	"kebabseller6/rwe/internal/manifest"
+	"kebabseller6/rwe/internal/service"
+	"net/http"
+)
+
+type SyncRequest struct {
+	Files manifest.Manifest `json:"files"`
+}
+
+type SyncResponse struct {
+	Missing []string `json:"missing"`
+}
+
+type UploadResponse struct {
+	Remaining int `json:"remaining"`
+}
+
+type WorkspaceHandler struct {
+	s  WorkspaceService
+	eh *ErrorHandler
+}
+
+func NewWorkspaceHandler(s WorkspaceService, eh *ErrorHandler) *WorkspaceHandler {
+	return &WorkspaceHandler{
+		s:  s,
+		eh: eh,
+	}
+}
+
+func (h *WorkspaceHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 20<<20)
+
+	if err := requireContentType(r, "application/gzip"); err != nil {
+		h.eh.HandleError(w, r, err)
+		return
+	}
+
+	res, err := h.s.Create(r.Context(), r.Body)
+	if err != nil {
+		h.eh.HandleError(w, r, err)
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, res)
+}
+
+func (h *WorkspaceHandler) HandleSync(w http.ResponseWriter, r *http.Request) {
+	var req SyncRequest
+	err := decodeJSON(w, r, 4<<20, &req)
+	if err != nil {
+		h.eh.HandleError(w, r, err)
+		return
+	}
+
+	id, err := pathID(r, "workspace")
+	if err != nil {
+		h.eh.HandleError(w, r, err)
+		return
+	}
+
+	if req.Files == nil {
+		h.eh.HandleError(w, r, fmt.Errorf(`%w: "files" is required`, service.ErrInvalidInput))
+		return
+	}
+
+	missing, err := h.s.Sync(r.Context(), id, req.Files)
+	if err != nil {
+		h.eh.HandleError(w, r, err)
+		return
+	}
+
+	res := SyncResponse{Missing: missing}
+	writeJSON(w, http.StatusOK, res)
+}
+
+func (h *WorkspaceHandler) HandleUpload(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 20<<20)
+
+	if err := requireContentType(r, "application/octet-stream"); err != nil {
+		h.eh.HandleError(w, r, err)
+		return
+	}
+
+	id, err := pathID(r, "workspace")
+	if err != nil {
+		h.eh.HandleError(w, r, err)
+		return
+	}
+
+	hash := r.PathValue("sha256")
+	if !manifest.Sha256Hex.MatchString(hash) {
+		h.eh.HandleError(w, r, fmt.Errorf("%w: invalid hash", service.ErrInvalidInput))
+		return
+	}
+
+	remaining, err := h.s.PutBlob(r.Context(), id, hash, r.Body)
+	if err != nil {
+		h.eh.HandleError(w, r, err)
+		return
+	}
+
+	res := UploadResponse{Remaining: remaining}
+	writeJSON(w, http.StatusOK, res)
+}
