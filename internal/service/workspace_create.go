@@ -27,7 +27,7 @@ func (s *WorkspaceService) Create(ctx context.Context, body io.Reader) (Workspac
 		return Workspace{}, err
 	}
 
-	if err := writeJSON(filepath.Join(tmp, manifestFile), m); err != nil {
+	if err := writeFileJSON(filepath.Join(tmp, manifestFile), m); err != nil {
 		return Workspace{}, err
 	}
 

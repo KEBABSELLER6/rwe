@@ -14,6 +14,8 @@ import (
 	"kebabseller6/rwe/internal/manifest"
 )
 
+const jobLogFile = "log"
+
 type JobStatus string
 
 const (
@@ -112,11 +114,11 @@ func (s *JobService) Get(id uuid.UUID) (Job, error) {
 }
 
 func (s *JobService) logPath(id uuid.UUID) string {
-	return filepath.Join(s.dir, id.String(), "log")
+	return filepath.Join(s.dir, id.String(), jobLogFile)
 }
 
 func (s *JobService) jobFilesDir(id uuid.UUID) string {
-	return filepath.Join(s.dir, id.String(), "files")
+	return filepath.Join(s.dir, id.String(), filesDirName)
 }
 
 func (s *JobService) Submit(req JobRequest) (Job, error) {

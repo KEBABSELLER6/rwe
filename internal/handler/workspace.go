@@ -7,7 +7,7 @@ import (
 	"net/http"
 )
 
-var maxUploadBytes = service.DefaultLimits.MaxTotalBytes
+var maxUploadBytes = service.DefaultWorkspaceLimits.MaxTotalBytes
 
 type SyncRequest struct {
 	Files      manifest.Manifest `json:"files"`

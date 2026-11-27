@@ -53,7 +53,7 @@ func (s *WorkspaceService) Sync(ctx context.Context, id uuid.UUID, want manifest
 		delete(current, p)
 	}
 
-	if err := writeJSON(s.manifestPath(id), current); err != nil {
+	if err := writeFileJSON(s.manifestPath(id), current); err != nil {
 		return nil, err
 	}
 
@@ -70,14 +70,14 @@ func (s *WorkspaceService) Sync(ctx context.Context, id uuid.UUID, want manifest
 	}
 	slices.Sort(missing)
 
-	if err := writeJSON(s.targetPath(id), syncTarget{Files: want, Sizes: sizes, Executable: executable}); err != nil {
+	if err := writeFileJSON(s.targetPath(id), syncTarget{Files: want, Sizes: sizes, Executable: executable}); err != nil {
 		return nil, err
 	}
 
 	return missing, nil
 }
 
-func validateManifest(m manifest.Manifest, lim Limits) error {
+func validateManifest(m manifest.Manifest, lim WorkspaceLimits) error {
 	if len(m) > lim.MaxFiles {
 		return fmt.Errorf("%w: more than %d files", ErrTooLarge, lim.MaxFiles)
 	}
@@ -101,7 +101,7 @@ func validateManifest(m manifest.Manifest, lim Limits) error {
 	return nil
 }
 
-func checkTotalSize(root *os.Root, current, want manifest.Manifest, sizes map[string]int64, lim Limits) error {
+func checkTotalSize(root *os.Root, current, want manifest.Manifest, sizes map[string]int64, lim WorkspaceLimits) error {
 	var total int64
 	for p, sum := range want {
 		size, declared := sizes[p]

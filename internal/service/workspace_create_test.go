@@ -115,7 +115,7 @@ func TestCreate_Rejects(t *testing.T) {
 	tests := []struct {
 		name    string
 		body    func(t *testing.T) *bytes.Buffer
-		limits  *Limits
+		limits  *WorkspaceLimits
 		wantErr error
 	}{
 		{
@@ -157,7 +157,7 @@ func TestCreate_Rejects(t *testing.T) {
 			body: func(t *testing.T) *bytes.Buffer {
 				return makeTarGz(t, []entry{{name: "big", body: strings.Repeat("x", 11)}})
 			},
-			limits:  &Limits{MaxTotalBytes: 10, MaxFiles: 10},
+			limits:  &WorkspaceLimits{MaxTotalBytes: 10, MaxFiles: 10},
 			wantErr: ErrTooLarge,
 		},
 		{
@@ -165,7 +165,7 @@ func TestCreate_Rejects(t *testing.T) {
 			body: func(t *testing.T) *bytes.Buffer {
 				return makeTarGz(t, []entry{{name: "a"}, {name: "b"}, {name: "c"}})
 			},
-			limits:  &Limits{MaxTotalBytes: 100, MaxFiles: 2},
+			limits:  &WorkspaceLimits{MaxTotalBytes: 100, MaxFiles: 2},
 			wantErr: ErrTooLarge,
 		},
 		{

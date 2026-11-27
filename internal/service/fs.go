@@ -34,7 +34,7 @@ func removeWithEmptyParents(root *os.Root, p string) error {
 	return nil
 }
 
-func writeJSON(name string, v any) error {
+func writeFileJSON(name string, v any) error {
 	raw, err := json.Marshal(v)
 	if err != nil {
 		return err

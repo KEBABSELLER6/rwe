@@ -19,12 +19,12 @@ const (
 	targetFile   = "target.json"
 )
 
-type Limits struct {
+type WorkspaceLimits struct {
 	MaxTotalBytes int64
 	MaxFiles      int
 }
 
-var DefaultLimits = Limits{
+var DefaultWorkspaceLimits = WorkspaceLimits{
 	MaxTotalBytes: 200 << 20,
 	MaxFiles:      20_000,
 }
@@ -42,7 +42,7 @@ type syncTarget struct {
 
 type WorkspaceService struct {
 	dir        string
-	limits     Limits
+	limits     WorkspaceLimits
 	manifestMu sync.Mutex
 	busy       map[uuid.UUID]bool
 }
@@ -51,7 +51,7 @@ func NewWorkspaceService(dir string) (*WorkspaceService, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, fmt.Errorf("create workspace dir: %w", err)
 	}
-	return &WorkspaceService{dir: dir, limits: DefaultLimits, busy: map[uuid.UUID]bool{}}, nil
+	return &WorkspaceService{dir: dir, limits: DefaultWorkspaceLimits, busy: map[uuid.UUID]bool{}}, nil
 }
 
 func (s *WorkspaceService) wsDir(id uuid.UUID) string {
