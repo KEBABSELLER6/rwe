@@ -34,7 +34,7 @@ func removeWithEmptyParents(root *os.Root, p string) error {
 	return nil
 }
 
-func writeJSON(name string, v any) error {
+func writeFileJSON(name string, v any) error {
 	raw, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -93,4 +93,19 @@ func forceRemoveAll(dir string) error {
 		return nil
 	})
 	return os.RemoveAll(dir)
+}
+
+func filePerm(executable bool) os.FileMode {
+	if executable {
+		return 0o755
+	}
+	return 0o644
+}
+
+func toSet(items []string) map[string]bool {
+	set := make(map[string]bool, len(items))
+	for _, item := range items {
+		set[item] = true
+	}
+	return set
 }

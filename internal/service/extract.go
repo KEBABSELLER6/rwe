@@ -15,7 +15,7 @@ import (
 	"kebabseller6/rwe/internal/manifest"
 )
 
-func extract(ctx context.Context, r io.Reader, dst string, lim Limits) (manifest.Manifest, error) {
+func extract(ctx context.Context, r io.Reader, dst string, lim WorkspaceLimits) (manifest.Manifest, error) {
 	zr, err := gzip.NewReader(r)
 	if err != nil {
 		return nil, fmt.Errorf("%w: not a gzip stream: %w", ErrInvalidInput, err)

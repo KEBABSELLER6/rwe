@@ -2,13 +2,19 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"time"
 	"uuid"
+
+	"kebabseller6/rwe/internal/manifest"
 )
+
+const jobLogFile = "log"
 
 type JobStatus string
 
@@ -108,9 +114,120 @@ func (s *JobService) Get(id uuid.UUID) (Job, error) {
 }
 
 func (s *JobService) logPath(id uuid.UUID) string {
-	return filepath.Join(s.dir, id.String(), "log")
+	return filepath.Join(s.dir, id.String(), jobLogFile)
 }
 
 func (s *JobService) jobFilesDir(id uuid.UUID) string {
-	return filepath.Join(s.dir, id.String(), "files")
+	return filepath.Join(s.dir, id.String(), filesDirName)
+}
+
+func (s *JobService) Submit(req JobRequest) (Job, error) {
+	if err := s.validate(&req); err != nil {
+		return Job{}, err
+	}
+
+	filesDir, err := s.workspaces.Acquire(req.WorkspaceID, req.ExpectedHash)
+	if err != nil {
+		return Job{}, err
+	}
+
+	job, err := s.newJob(req, filesDir)
+	if err != nil {
+		s.workspaces.Release(req.WorkspaceID)
+		return Job{}, err
+	}
+
+	select {
+	case s.queue <- job.ID:
+		return job, nil
+	default:
+		s.forget(job.ID)
+		s.workspaces.Release(req.WorkspaceID)
+		return Job{}, fmt.Errorf("%w: job queue is full", ErrConflict)
+	}
+}
+
+var errCancelled = errors.New("cancelled by client")
+
+func (s *JobService) Cancel(id uuid.UUID) (Job, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	job, ok := s.jobs[id]
+	if !ok {
+		return Job{}, fmt.Errorf("%w: job %s", ErrNotFound, id)
+	}
+	switch job.Status {
+	case JobQueued:
+		job.Status = JobCancelled
+		job.FinishedAt = time.Now()
+		s.workspaces.Release(job.WorkspaceID)
+	case JobRunning:
+		job.cancel(errCancelled)
+	}
+	return *job, nil
+}
+
+func (s *JobService) validate(req *JobRequest) error {
+	switch {
+	case !manifest.Sha256Hex.MatchString(req.ExpectedHash):
+		return fmt.Errorf("%w: expected_hash must be a sha256", ErrInvalidInput)
+	case req.Image == "":
+		return fmt.Errorf("%w: image is required", ErrInvalidInput)
+	case len(req.Command) == 0:
+		return fmt.Errorf("%w: command is required", ErrInvalidInput)
+	case req.Timeout < 0 || req.Timeout > s.limits.MaxTimeout:
+		return fmt.Errorf("%w: timeout must be between 0 and %s", ErrInvalidInput, s.limits.MaxTimeout)
+	case req.Memory < 0 || req.CPUs < 0:
+		return fmt.Errorf("%w: limits must not be negative", ErrInvalidInput)
+	case s.limits.MaxMemory > 0 && req.Memory > s.limits.MaxMemory:
+		return fmt.Errorf("%w: memory must not exceed %d bytes", ErrInvalidInput, s.limits.MaxMemory)
+	}
+	if req.Timeout == 0 {
+		req.Timeout = s.limits.DefaultTimeout
+	}
+	if req.Memory == 0 {
+		req.Memory = s.limits.MaxMemory
+	}
+	return nil
+}
+
+func (s *JobService) newJob(req JobRequest, filesDir string) (Job, error) {
+	id := uuid.NewV7()
+	if err := os.MkdirAll(filepath.Dir(s.logPath(id)), 0o755); err != nil {
+		return Job{}, err
+	}
+	if err := os.WriteFile(s.logPath(id), nil, 0o644); err != nil {
+		return Job{}, err
+	}
+
+	job := &Job{
+		ID:          id,
+		WorkspaceID: req.WorkspaceID,
+		Image:       req.Image,
+		Command:     slices.Clone(req.Command),
+		Status:      JobQueued,
+		CreatedAt:   time.Now(),
+		spec: RunSpec{
+			Name:     "rwe-" + id.String(),
+			Image:    req.Image,
+			Command:  slices.Clone(req.Command),
+			FilesDir: filesDir,
+			Timeout:  req.Timeout,
+			Memory:   req.Memory,
+			CPUs:     req.CPUs,
+		},
+	}
+
+	s.mu.Lock()
+	s.jobs[id] = job
+	s.mu.Unlock()
+	return *job, nil
+}
+
+func (s *JobService) forget(id uuid.UUID) {
+	s.mu.Lock()
+	delete(s.jobs, id)
+	s.mu.Unlock()
+	forceRemoveAll(filepath.Dir(s.logPath(id)))
 }

@@ -84,7 +84,7 @@ func (s *WorkspaceService) PutBlob(ctx context.Context, id uuid.UUID, sum string
 		current[p] = sum
 	}
 
-	if err := writeJSON(s.manifestPath(id), current); err != nil {
+	if err := writeFileJSON(s.manifestPath(id), current); err != nil {
 		return 0, err
 	}
 
