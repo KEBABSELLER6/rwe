@@ -26,12 +26,17 @@ func main() {
 	addr := flag.String("addr", envOr("RWE_ADDR", ":8999"), "listen address (env RWE_ADDR)")
 	dataDir := flag.String("data", envOr("RWE_DATA", "local_data"), "directory for workspaces and job logs (env RWE_DATA)")
 	jobMemory := flag.String("job-memory", envOr("RWE_JOB_MEMORY", ""), "memory cap per job, e.g. 2g; also the default when a job sets none (env RWE_JOB_MEMORY)")
+	logRetention := flag.String("log-retention", envOr("RWE_LOG_RETENTION", service.DefaultJobLimits.LogRetention.String()), "delete job logs this long after the job finished, e.g. 72h; 0 keeps them (env RWE_LOG_RETENTION)")
 	flag.Parse()
 
 	limits := service.DefaultJobLimits
 	var err error
 	if limits.MaxMemory, err = parseBytes(*jobMemory); err != nil {
 		slog.Error("invalid job memory", "value", *jobMemory, "err", err)
+		os.Exit(2)
+	}
+	if limits.LogRetention, err = time.ParseDuration(*logRetention); err != nil {
+		slog.Error("invalid log retention", "value", *logRetention, "err", err)
 		os.Exit(2)
 	}
 
@@ -84,7 +89,7 @@ func run(addr, dataDir string, limits service.JobLimits) error {
 
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- srv.Serve(ln) }()
-	logger.Info("server started", "version", version, "addr", ln.Addr().String(), "data", dataDir, "job_memory", limits.MaxMemory)
+	logger.Info("server started", "version", version, "addr", ln.Addr().String(), "data", dataDir, "job_memory", limits.MaxMemory, "log_retention", limits.LogRetention)
 
 	var runErr error
 	select {

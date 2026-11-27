@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"io/fs"
 	"os"
 	"time"
 	"uuid"
@@ -21,6 +22,9 @@ func (s *JobService) FollowLogs(ctx context.Context, id uuid.UUID, emitLine func
 	}
 
 	f, err := os.Open(s.logPath(id))
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
 	if err != nil {
 		return err
 	}

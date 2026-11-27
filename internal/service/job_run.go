@@ -10,10 +10,15 @@ import (
 )
 
 func (s *JobService) Start(ctx context.Context) {
+	s.pruneLogs(time.Now())
+	prune := time.NewTicker(pruneInterval)
+	defer prune.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
+		case now := <-prune.C:
+			s.pruneLogs(now)
 		case id := <-s.queue:
 			s.run(ctx, id)
 		}
