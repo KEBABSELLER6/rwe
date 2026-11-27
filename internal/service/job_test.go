@@ -50,7 +50,7 @@ func newJobEnv(t *testing.T, run func(context.Context, RunSpec, io.Writer) (int,
 	}
 
 	runner := &fakeRunner{run: run}
-	jobs, err := NewJobService(t.TempDir(), ws, runner, DefaultJobLimits)
+	jobs, err := NewJobService(t.TempDir(), t.TempDir(), ws, runner, DefaultJobLimits)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -286,7 +286,7 @@ func TestJob_SubmitRejects(t *testing.T) {
 }
 
 func TestJob_QueueFull(t *testing.T) {
-	jobs, err := NewJobService(t.TempDir(), nil, nil, DefaultJobLimits)
+	jobs, err := NewJobService(t.TempDir(), t.TempDir(), nil, nil, DefaultJobLimits)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -438,7 +438,7 @@ func TestJob_CancelRunning(t *testing.T) {
 
 func TestJob_CancelQueued(t *testing.T) {
 	env := newJobEnv(t, exitWith(0, nil, ""))
-	jobs, err := NewJobService(t.TempDir(), env.ws, env.runner, DefaultJobLimits)
+	jobs, err := NewJobService(t.TempDir(), t.TempDir(), env.ws, env.runner, DefaultJobLimits)
 	if err != nil {
 		t.Fatal(err)
 	}

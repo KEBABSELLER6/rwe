@@ -40,6 +40,7 @@ type JobRequest struct {
 	Timeout      time.Duration
 	Memory       int64
 	CPUs         float64
+	Caches       []string
 }
 
 type Job struct {
@@ -47,6 +48,7 @@ type Job struct {
 	WorkspaceID uuid.UUID `json:"workspace_id"`
 	Image       string    `json:"image"`
 	Command     []string  `json:"command"`
+	Caches      []string  `json:"caches,omitempty"`
 	Status      JobStatus `json:"status"`
 	ExitCode    *int      `json:"exit_code,omitempty"`
 	Error       string    `json:"error,omitempty"`
@@ -81,6 +83,7 @@ type WorkspaceLocker interface {
 
 type JobService struct {
 	dir        string
+	cachesDir  string
 	workspaces WorkspaceLocker
 	runner     Runner
 	limits     JobLimits
@@ -90,12 +93,13 @@ type JobService struct {
 	jobs map[uuid.UUID]*Job
 }
 
-func NewJobService(dir string, workspaces WorkspaceLocker, runner Runner, limits JobLimits) (*JobService, error) {
+func NewJobService(dir, cachesDir string, workspaces WorkspaceLocker, runner Runner, limits JobLimits) (*JobService, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, fmt.Errorf("create jobs dir: %w", err)
 	}
 	s := &JobService{
 		dir:        dir,
+		cachesDir:  cachesDir,
 		workspaces: workspaces,
 		runner:     runner,
 		limits:     limits,
@@ -190,6 +194,9 @@ func (s *JobService) validate(req *JobRequest) error {
 	case s.limits.MaxMemory > 0 && req.Memory > s.limits.MaxMemory:
 		return fmt.Errorf("%w: memory must not exceed %d bytes", ErrInvalidInput, s.limits.MaxMemory)
 	}
+	if err := validateCaches(req.Caches); err != nil {
+		return err
+	}
 	if req.Timeout == 0 {
 		req.Timeout = s.limits.DefaultTimeout
 	}
@@ -213,6 +220,7 @@ func (s *JobService) newJob(req JobRequest, filesDir string) (Job, error) {
 		WorkspaceID: req.WorkspaceID,
 		Image:       req.Image,
 		Command:     slices.Clone(req.Command),
+		Caches:      slices.Clone(req.Caches),
 		Status:      JobQueued,
 		CreatedAt:   time.Now(),
 		spec: RunSpec{
@@ -223,6 +231,7 @@ func (s *JobService) newJob(req JobRequest, filesDir string) (Job, error) {
 			Timeout:  req.Timeout,
 			Memory:   req.Memory,
 			CPUs:     req.CPUs,
+			Caches:   s.cacheMounts(req.WorkspaceID, req.Caches),
 		},
 	}
 

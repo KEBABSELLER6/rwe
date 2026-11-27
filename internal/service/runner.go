@@ -14,6 +14,7 @@ type RunSpec struct {
 	Timeout  time.Duration
 	Memory   int64
 	CPUs     float64
+	Caches   []CacheMount
 }
 
 type Runner interface {

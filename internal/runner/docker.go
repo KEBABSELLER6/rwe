@@ -15,7 +15,6 @@ import (
 )
 
 const (
-	workspaceMount  = "/workspace"
 	pidsLimit       = "1024"
 	dockerErrorCode = 125
 	removeTimeout   = 30 * time.Second
@@ -79,8 +78,15 @@ func runArgs(spec service.RunSpec) ([]string, error) {
 		"--env", "HOME=/tmp",
 		"--security-opt", "no-new-privileges",
 		"--pids-limit", pidsLimit,
-		"--volume", filesDir + ":" + workspaceMount,
-		"--workdir", workspaceMount,
+		"--volume", filesDir + ":" + service.WorkspaceMount,
+		"--workdir", service.WorkspaceMount,
+	}
+	for _, c := range spec.Caches {
+		hostDir, err := filepath.Abs(c.HostDir)
+		if err != nil {
+			return nil, err
+		}
+		args = append(args, "--volume", hostDir+":"+c.Path)
 	}
 	if spec.Memory > 0 {
 		args = append(args, "--memory", strconv.FormatInt(spec.Memory, 10))

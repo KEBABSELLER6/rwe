@@ -11,7 +11,7 @@ import (
 func TestJobStore_FinishedJobSurvivesRestart(t *testing.T) {
 	env := newJobEnv(t, exitWith(3, nil, "boom\n"))
 	dir := t.TempDir()
-	before, err := NewJobService(dir, env.ws, env.runner, DefaultJobLimits)
+	before, err := NewJobService(dir, t.TempDir(), env.ws, env.runner, DefaultJobLimits)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -22,7 +22,7 @@ func TestJobStore_FinishedJobSurvivesRestart(t *testing.T) {
 	before.run(t.Context(), job.ID)
 	want, _ := before.Get(job.ID)
 
-	after, err := NewJobService(dir, nil, nil, DefaultJobLimits)
+	after, err := NewJobService(dir, t.TempDir(), nil, nil, DefaultJobLimits)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,7 +41,7 @@ func TestJobStore_FinishedJobSurvivesRestart(t *testing.T) {
 func TestJobStore_UnfinishedJobBecomesError(t *testing.T) {
 	env := newJobEnv(t, exitWith(0, nil, ""))
 	dir := t.TempDir()
-	before, err := NewJobService(dir, env.ws, env.runner, DefaultJobLimits)
+	before, err := NewJobService(dir, t.TempDir(), env.ws, env.runner, DefaultJobLimits)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,7 +54,7 @@ func TestJobStore_UnfinishedJobBecomesError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	after, err := NewJobService(dir, nil, nil, DefaultJobLimits)
+	after, err := NewJobService(dir, t.TempDir(), nil, nil, DefaultJobLimits)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +69,7 @@ func TestJobStore_UnfinishedJobBecomesError(t *testing.T) {
 		t.Errorf("leftover job files not removed: %v", err)
 	}
 
-	again, err := NewJobService(dir, nil, nil, DefaultJobLimits)
+	again, err := NewJobService(dir, t.TempDir(), nil, nil, DefaultJobLimits)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +91,7 @@ func TestJobStore_SkipsDirsWithoutState(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	jobs, err := NewJobService(dir, nil, nil, DefaultJobLimits)
+	jobs, err := NewJobService(dir, t.TempDir(), nil, nil, DefaultJobLimits)
 	if err != nil {
 		t.Fatal(err)
 	}

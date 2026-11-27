@@ -25,6 +25,7 @@ type JobSpec struct {
 	Image          string   `json:"image"`
 	Command        []string `json:"command"`
 	TimeoutSeconds int      `json:"timeout_seconds,omitzero"`
+	Caches         []string `json:"caches,omitempty"`
 }
 
 type Job struct {

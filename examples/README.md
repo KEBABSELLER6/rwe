@@ -30,7 +30,20 @@ Per project you also want a `.rwe.json`, like the one at this repo's root:
 
 Later wins: built-in defaults (`http://localhost:8999`, `golang:1.27`) →
 `~/.config/rwe/config.json` → `<project>/.rwe.json` → `RWE_URL` / `RWE_IMAGE` → `rwe run -i IMAGE`.
-Both files accept `server` and `image`; unknown keys are an error.
+Both files accept `server`, `image` and `caches`; unknown keys are an error.
+
+## Caches
+
+`caches` lists container paths that are kept between jobs, so installs and builds start warm.
+Jobs run as the server's user with `HOME=/tmp`, so tool caches live under `/tmp`:
+
+```json
+{ "image": "oven/bun:1", "caches": ["/tmp/.bun/install/cache", "/workspace/node_modules"] }
+```
+
+A path under `/workspace` is kept per workspace (one `node_modules` per project). Any other path
+is shared by every job on the server, which suits download and build caches. They live in
+`<data>/caches`; delete that directory to start cold again.
 
 The server has no config file: `-addr` / `-data` flags, defaulting to `RWE_ADDR` / `RWE_DATA`,
 then `:8999` / `local_data`. `RWE_JOB_MEMORY` (or `-job-memory`, e.g. `2g`) caps each job's memory:

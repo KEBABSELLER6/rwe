@@ -21,7 +21,7 @@ func TestJobRetention_PrunesOnlyExpiredLogs(t *testing.T) {
 			env := newJobEnv(t, exitWith(0, nil, "hello\n"))
 			limits := DefaultJobLimits
 			limits.LogRetention = tc.retention
-			jobs, err := NewJobService(t.TempDir(), env.ws, env.runner, limits)
+			jobs, err := NewJobService(t.TempDir(), t.TempDir(), env.ws, env.runner, limits)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -50,7 +50,7 @@ func TestJobRetention_PrunesOnlyExpiredLogs(t *testing.T) {
 
 func TestJobRetention_KeepsUnfinishedJobLogs(t *testing.T) {
 	env := newJobEnv(t, exitWith(0, nil, ""))
-	jobs, err := NewJobService(t.TempDir(), env.ws, env.runner, DefaultJobLimits)
+	jobs, err := NewJobService(t.TempDir(), t.TempDir(), env.ws, env.runner, DefaultJobLimits)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -72,7 +72,7 @@ func runCmd(ctx context.Context, cfg config, args []string) (int, error) {
 	}
 
 	c := client.New(cfg.Server)
-	job, err := c.Run(ctx, cfg.dir, client.JobSpec{Image: *image, Command: fs.Args(), TimeoutSeconds: *timeout}, func(line string) {
+	job, err := c.Run(ctx, cfg.dir, client.JobSpec{Image: *image, Command: fs.Args(), TimeoutSeconds: *timeout, Caches: cfg.Caches}, func(line string) {
 		fmt.Println(line)
 	})
 	if err != nil {
