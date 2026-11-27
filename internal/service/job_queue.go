@@ -39,6 +39,27 @@ func (s *JobService) Submit(req JobRequest) (Job, error) {
 	}
 }
 
+var errCancelled = errors.New("cancelled by client")
+
+func (s *JobService) Cancel(id uuid.UUID) (Job, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	job, ok := s.jobs[id]
+	if !ok {
+		return Job{}, fmt.Errorf("%w: job %s", ErrNotFound, id)
+	}
+	switch job.Status {
+	case JobQueued:
+		job.Status = JobCancelled
+		job.FinishedAt = time.Now()
+		s.workspaces.Release(job.WorkspaceID)
+	case JobRunning:
+		job.cancel(errCancelled)
+	}
+	return *job, nil
+}
+
 func (s *JobService) Start(ctx context.Context) {
 	for {
 		select {
@@ -115,10 +136,18 @@ func (s *JobService) forget(id uuid.UUID) {
 }
 
 func (s *JobService) run(ctx context.Context, id uuid.UUID) {
+	ctx, cancel := context.WithCancelCause(ctx)
+	defer cancel(nil)
+
 	s.mu.Lock()
 	job := s.jobs[id]
+	if job.Status == JobCancelled {
+		s.mu.Unlock()
+		return
+	}
 	job.Status = JobRunning
 	job.StartedAt = time.Now()
+	job.cancel = cancel
 	spec := job.spec
 	s.mu.Unlock()
 
@@ -130,6 +159,8 @@ func (s *JobService) run(ctx context.Context, id uuid.UUID) {
 	job.FinishedAt = time.Now()
 	job.DurationMS = job.FinishedAt.Sub(job.StartedAt).Milliseconds()
 	switch {
+	case err != nil && errors.Is(context.Cause(ctx), errCancelled):
+		job.Status = JobCancelled
 	case errors.Is(err, context.DeadlineExceeded):
 		job.Status = JobTimeout
 		job.Error = fmt.Sprintf("timed out after %s", spec.Timeout)

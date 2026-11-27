@@ -2,6 +2,8 @@ package client
 
 import (
 	"context"
+	"crypto/rand"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -11,6 +13,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"kebabseller6/rwe/internal/handler"
 	"kebabseller6/rwe/internal/service"
@@ -32,12 +35,17 @@ func (lsRunner) Run(ctx context.Context, spec service.RunSpec, logs io.Writer) (
 
 func newTestClient(t *testing.T) *Client {
 	t.Helper()
+	return newTestClientWith(t, lsRunner{})
+}
+
+func newTestClientWith(t *testing.T, runner service.Runner) *Client {
+	t.Helper()
 	data := t.TempDir()
 	ws, err := service.NewWorkspaceService(filepath.Join(data, "workspaces"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	jobs, err := service.NewJobService(filepath.Join(data, "jobs"), ws, lsRunner{}, service.DefaultJobLimits)
+	jobs, err := service.NewJobService(filepath.Join(data, "jobs"), ws, runner, service.DefaultJobLimits)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,6 +90,48 @@ func TestRunSyncsAndStreamsLogs(t *testing.T) {
 	}
 }
 
+type blockingRunner struct{ started chan string }
+
+func (r blockingRunner) Run(ctx context.Context, spec service.RunSpec, logs io.Writer) (int, error) {
+	r.started <- spec.Name
+	<-ctx.Done()
+	return -1, ctx.Err()
+}
+
+func TestRunCancelStopsServerJob(t *testing.T) {
+	runner := blockingRunner{started: make(chan string, 1)}
+	c := newTestClientWith(t, runner)
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{"a.txt": "a"})
+
+	ctx, cancel := context.WithCancel(t.Context())
+	errc := make(chan error, 1)
+	go func() {
+		_, err := c.Run(ctx, dir, JobSpec{Image: "img", Command: []string{"sleep"}}, func(string) {})
+		errc <- err
+	}()
+	id := strings.TrimPrefix(<-runner.started, "rwe-")
+	cancel()
+	if err := <-errc; !errors.Is(err, context.Canceled) {
+		t.Fatalf("run err = %v, want context.Canceled", err)
+	}
+
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		job, err := c.Job(t.Context(), id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if job.Status == JobCancelled {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("server job status = %s, want cancelled", job.Status)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
 func TestSyncUploadsOnlyChanges(t *testing.T) {
 	c := newTestClient(t)
 	dir := t.TempDir()
@@ -105,6 +155,32 @@ func TestSyncUploadsOnlyChanges(t *testing.T) {
 	if second.WorkspaceID != first.WorkspaceID || second.Uploaded != 1 || second.Files != 3 {
 		t.Fatalf("second sync = %+v, want same workspace, one deduplicated upload, 3 files", second)
 	}
+}
+
+func TestSyncFilesOver20MiB(t *testing.T) {
+	c := newTestClient(t)
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{"big.bin": string(randomBytes(t, 21<<20))})
+
+	if _, err := c.Sync(t.Context(), dir); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	writeFiles(t, dir, map[string]string{"big.bin": string(randomBytes(t, 21<<20))})
+	synced, err := c.Sync(t.Context(), dir)
+	if err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	if synced.Uploaded != 1 {
+		t.Fatalf("sync = %+v, want the big file uploaded", synced)
+	}
+}
+
+func randomBytes(t *testing.T, n int) []byte {
+	t.Helper()
+	b := make([]byte, n)
+	rand.Read(b)
+	return b
 }
 
 func TestSyncRecreatesUnknownWorkspace(t *testing.T) {

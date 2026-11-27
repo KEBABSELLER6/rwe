@@ -77,6 +77,22 @@ func (h *JobHandler) HandleGet(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, res)
 }
 
+func (h *JobHandler) HandleCancel(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r, "job")
+	if err != nil {
+		h.eh.HandleError(w, r, err)
+		return
+	}
+
+	res, err := h.s.Cancel(id)
+	if err != nil {
+		h.eh.HandleError(w, r, err)
+		return
+	}
+
+	writeJSON(w, http.StatusAccepted, res)
+}
+
 func (h *JobHandler) HandleLogs(w http.ResponseWriter, r *http.Request) {
 	id, err := pathID(r, "job")
 	if err != nil {

@@ -7,6 +7,8 @@ import (
 	"net/http"
 )
 
+var maxUploadBytes = service.DefaultLimits.MaxTotalBytes
+
 type SyncRequest struct {
 	Files manifest.Manifest `json:"files"`
 }
@@ -32,7 +34,7 @@ func NewWorkspaceHandler(s WorkspaceService, eh *ErrorHandler) *WorkspaceHandler
 }
 
 func (h *WorkspaceHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, 20<<20)
+	r.Body = http.MaxBytesReader(w, r.Body, maxUploadBytes)
 
 	if err := requireContentType(r, "application/gzip"); err != nil {
 		h.eh.HandleError(w, r, err)
@@ -78,7 +80,7 @@ func (h *WorkspaceHandler) HandleSync(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *WorkspaceHandler) HandleUpload(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, 20<<20)
+	r.Body = http.MaxBytesReader(w, r.Body, maxUploadBytes)
 
 	if err := requireContentType(r, "application/octet-stream"); err != nil {
 		h.eh.HandleError(w, r, err)

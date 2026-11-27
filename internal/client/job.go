@@ -7,14 +7,18 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 )
+
+const detachedTimeout = 10 * time.Second
 
 type JobStatus string
 
 const (
-	JobPassed  JobStatus = "passed"
-	JobFailed  JobStatus = "failed"
-	JobTimeout JobStatus = "timeout"
+	JobPassed    JobStatus = "passed"
+	JobFailed    JobStatus = "failed"
+	JobTimeout   JobStatus = "timeout"
+	JobCancelled JobStatus = "cancelled"
 )
 
 type JobSpec struct {
@@ -38,11 +42,28 @@ func (c *Client) Run(ctx context.Context, dir string, spec JobSpec, emit func(li
 	if err != nil {
 		return Job{}, fmt.Errorf("sync: %w", err)
 	}
-	job, err := c.Submit(ctx, synced, spec)
+	submitCtx, cancel := detached(ctx)
+	job, err := c.Submit(submitCtx, synced, spec)
+	cancel()
 	if err != nil {
 		return Job{}, err
 	}
-	return c.FollowLogs(ctx, job.ID, emit)
+
+	final, err := c.FollowLogs(ctx, job.ID, emit)
+	if ctx.Err() != nil {
+		cancelCtx, cancel := detached(ctx)
+		defer cancel()
+		c.Cancel(cancelCtx, job.ID)
+	}
+	return final, err
+}
+
+func detached(ctx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.WithoutCancel(ctx), detachedTimeout)
+}
+
+func (c *Client) Cancel(ctx context.Context, id string) error {
+	return c.do(ctx, http.MethodDelete, "/jobs/"+id, "", nil, nil)
 }
 
 func (c *Client) Submit(ctx context.Context, synced Synced, spec JobSpec) (Job, error) {
