@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,12 +13,13 @@ import (
 type JobStatus string
 
 const (
-	JobQueued  JobStatus = "queued"
-	JobRunning JobStatus = "running"
-	JobPassed  JobStatus = "passed"
-	JobFailed  JobStatus = "failed"
-	JobTimeout JobStatus = "timeout"
-	JobError   JobStatus = "error"
+	JobQueued    JobStatus = "queued"
+	JobRunning   JobStatus = "running"
+	JobPassed    JobStatus = "passed"
+	JobFailed    JobStatus = "failed"
+	JobTimeout   JobStatus = "timeout"
+	JobError     JobStatus = "error"
+	JobCancelled JobStatus = "cancelled"
 )
 
 func (s JobStatus) Finished() bool {
@@ -47,7 +49,8 @@ type Job struct {
 	FinishedAt  time.Time `json:"finished_at,omitzero"`
 	DurationMS  int64     `json:"duration_ms,omitzero"`
 
-	spec RunSpec
+	spec   RunSpec
+	cancel context.CancelCauseFunc
 }
 
 type JobLimits struct {

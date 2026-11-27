@@ -380,3 +380,68 @@ func TestJob_MaxMemory(t *testing.T) {
 		t.Errorf("over cap: err = %v, want ErrInvalidInput", err)
 	}
 }
+
+func TestJob_CancelRunning(t *testing.T) {
+	started := make(chan struct{})
+	env := newJobEnv(t, func(ctx context.Context, _ RunSpec, _ io.Writer) (int, error) {
+		close(started)
+		<-ctx.Done()
+		return -1, fmt.Errorf("stopped: %w", ctx.Err())
+	})
+
+	job, err := env.jobs.Submit(env.request())
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-started
+	if _, err := env.jobs.Cancel(job.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := waitFinished(t, env.jobs, job.ID); got.Status != JobCancelled {
+		t.Errorf("status = %s, want cancelled", got.Status)
+	}
+	if _, err := env.ws.Sync(t.Context(), env.wsID, manifest.Manifest{}); err != nil {
+		t.Errorf("workspace not released after cancel: %v", err)
+	}
+}
+
+func TestJob_CancelQueued(t *testing.T) {
+	env := newJobEnv(t, exitWith(0, nil, ""))
+	jobs, err := NewJobService(t.TempDir(), env.ws, env.runner, DefaultJobLimits)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	job, err := jobs.Submit(env.request())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := jobs.Cancel(job.ID); err != nil || got.Status != JobCancelled {
+		t.Fatalf("cancel = %s, %v; want cancelled", got.Status, err)
+	}
+	if _, err := env.ws.Sync(t.Context(), env.wsID, manifest.Manifest{}); err != nil {
+		t.Errorf("workspace not released after cancel: %v", err)
+	}
+
+	jobs.run(t.Context(), job.ID)
+	if len(env.runner.specs) != 0 {
+		t.Errorf("cancelled job was run")
+	}
+}
+
+func TestJob_CancelUnknownOrFinished(t *testing.T) {
+	env := newJobEnv(t, exitWith(0, nil, ""))
+	if _, err := env.jobs.Cancel(uuid.NewV7()); !errors.Is(err, ErrNotFound) {
+		t.Errorf("unknown job: err = %v, want ErrNotFound", err)
+	}
+
+	job, err := env.jobs.Submit(env.request())
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFinished(t, env.jobs, job.ID)
+	if got, err := env.jobs.Cancel(job.ID); err != nil || got.Status != JobPassed {
+		t.Errorf("cancel finished job = %s, %v; want passed, unchanged", got.Status, err)
+	}
+}

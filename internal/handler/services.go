@@ -18,4 +18,5 @@ type JobService interface {
 	Submit(req service.JobRequest) (service.Job, error)
 	FollowLogs(ctx context.Context, id uuid.UUID, emitLine func(line []byte) error) error
 	Get(id uuid.UUID) (service.Job, error)
+	Cancel(id uuid.UUID) (service.Job, error)
 }
