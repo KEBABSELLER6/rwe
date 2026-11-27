@@ -10,7 +10,10 @@ import (
 	"uuid"
 )
 
-const logPollInterval = 200 * time.Millisecond
+const (
+	logPollInterval = 200 * time.Millisecond
+	maxLogLine      = 64 << 10
+)
 
 func (s *JobService) FollowLogs(ctx context.Context, id uuid.UUID, emitLine func(line []byte) error) error {
 	if _, err := s.Get(id); err != nil {
@@ -63,13 +66,18 @@ func (s *JobService) FollowLogs(ctx context.Context, id uuid.UUID, emitLine func
 
 func emitLines(data []byte, emitLine func([]byte) error) ([]byte, error) {
 	for {
-		i := bytes.IndexByte(data, '\n')
-		if i < 0 {
+		line, rest := data, data
+		switch i := bytes.IndexByte(data, '\n'); {
+		case i >= 0 && i <= maxLogLine:
+			line, rest = data[:i], data[i+1:]
+		case len(data) > maxLogLine:
+			line, rest = data[:maxLogLine], data[maxLogLine:]
+		default:
 			return data, nil
 		}
-		if err := emitLine(data[:i]); err != nil {
+		if err := emitLine(line); err != nil {
 			return nil, err
 		}
-		data = data[i+1:]
+		data = rest
 	}
 }
