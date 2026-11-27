@@ -61,7 +61,8 @@ Works today:
 
 Known limits:
 
-- Jobs are kept in memory; a server restart forgets them (workspaces survive on disk).
+- A server restart ends queued and running jobs with status `error`; finished jobs survive.
+- Job state and logs are never deleted; old job folders pile up under `<data>/jobs`.
 - A sync with a running job gets 409: one job per workspace at a time.
 - Only the exec bit of a file is synced, not its full mode (files are 0644 or 0755).
 - A command that exits with 125 is reported as a docker failure, since docker uses that code for its own errors.
@@ -69,7 +70,7 @@ Known limits:
 - No cache volumes, so each job starts cold (e.g. Go module and build cache).
 
 Planned, in rough order: release binaries, deployment notes, then artifacts, cache volumes,
-workspace cleanup and a persistent job list.
+workspace and job cleanup.
 
 ## Development
 
