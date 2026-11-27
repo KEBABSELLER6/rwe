@@ -117,9 +117,8 @@ func (s *JobService) run(ctx context.Context, id uuid.UUID) {
 	spec := job.spec
 	s.mu.Unlock()
 
-	defer s.workspaces.Release(job.WorkspaceID)
-
-	code, err := s.runWithLog(ctx, id, spec)
+	code, err := s.runOnCopy(ctx, id, spec)
+	s.workspaces.Release(job.WorkspaceID)
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -139,6 +138,16 @@ func (s *JobService) run(ctx context.Context, id uuid.UUID) {
 		job.Status = JobFailed
 		job.ExitCode = &code
 	}
+}
+
+func (s *JobService) runOnCopy(ctx context.Context, id uuid.UUID, spec RunSpec) (int, error) {
+	filesDir := s.jobFilesDir(id)
+	defer os.RemoveAll(filesDir)
+	if err := os.CopyFS(filesDir, os.DirFS(spec.FilesDir)); err != nil {
+		return -1, fmt.Errorf("copy workspace for job: %w", err)
+	}
+	spec.FilesDir = filesDir
+	return s.runWithLog(ctx, id, spec)
 }
 
 func (s *JobService) runWithLog(ctx context.Context, id uuid.UUID, spec RunSpec) (int, error) {

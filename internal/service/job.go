@@ -106,3 +106,7 @@ func (s *JobService) Get(id uuid.UUID) (Job, error) {
 func (s *JobService) logPath(id uuid.UUID) string {
 	return filepath.Join(s.dir, id.String(), "log")
 }
+
+func (s *JobService) jobFilesDir(id uuid.UUID) string {
+	return filepath.Join(s.dir, id.String(), "files")
+}

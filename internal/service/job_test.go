@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -35,6 +37,7 @@ type jobEnv struct {
 	jobs   *JobService
 	runner *fakeRunner
 	wsID   uuid.UUID
+	wsDir  string
 	hash   string
 }
 
@@ -51,9 +54,14 @@ func newJobEnv(t *testing.T, run func(context.Context, RunSpec, io.Writer) (int,
 	if err != nil {
 		t.Fatal(err)
 	}
-	go jobs.Start(t.Context())
+	stopped := make(chan struct{})
+	go func() {
+		jobs.Start(t.Context())
+		close(stopped)
+	}()
+	t.Cleanup(func() { <-stopped })
 
-	return &jobEnv{ws: ws, jobs: jobs, runner: runner, wsID: wsID, hash: current.Hash()}
+	return &jobEnv{ws: ws, jobs: jobs, runner: runner, wsID: wsID, wsDir: wsDir, hash: current.Hash()}
 }
 
 func (e *jobEnv) request() JobRequest {
@@ -142,8 +150,8 @@ func TestJob_RunSpec(t *testing.T) {
 	if spec.Name != "rwe-"+job.ID.String() || spec.Image != "golang:1.27" || !slices.Equal(spec.Command, []string{"make", "test"}) {
 		t.Errorf("spec = %+v", spec)
 	}
-	if filepath.Base(spec.FilesDir) != "files" {
-		t.Errorf("FilesDir = %s, want the workspace files dir", spec.FilesDir)
+	if strings.HasPrefix(spec.FilesDir, env.wsDir) {
+		t.Errorf("FilesDir = %s, want a per-job copy, not the workspace files dir", spec.FilesDir)
 	}
 	if spec.Timeout != DefaultJobLimits.DefaultTimeout || spec.Memory != 1<<30 {
 		t.Errorf("timeout/memory = %s/%d", spec.Timeout, spec.Memory)
@@ -175,6 +183,45 @@ func TestJob_WorkspaceBusyWhileQueuedOrRunning(t *testing.T) {
 	if _, err := env.jobs.Submit(env.request()); err != nil {
 		t.Errorf("submit after job finished: %v", err)
 	}
+}
+
+func TestJob_RunsOnCopyOfWorkspace(t *testing.T) {
+	var jobFiles string
+	env := newJobEnv(t, func(_ context.Context, spec RunSpec, _ io.Writer) (int, error) {
+		jobFiles = spec.FilesDir
+		got, err := os.ReadFile(filepath.Join(spec.FilesDir, "keep.txt"))
+		if err != nil || string(got) != "keep" {
+			return -1, fmt.Errorf("job copy keep.txt = %q, %v", got, err)
+		}
+		if err := os.WriteFile(filepath.Join(spec.FilesDir, "change.txt"), []byte("rewritten"), 0o644); err != nil {
+			return -1, err
+		}
+		return 0, os.WriteFile(filepath.Join(spec.FilesDir, "out.bin"), []byte("artifact"), 0o644)
+	})
+
+	job, err := env.jobs.Submit(env.request())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if done := waitFinished(t, env.jobs, job.ID); done.Status != JobPassed {
+		t.Fatalf("status = %s, error: %s", done.Status, done.Error)
+	}
+
+	files := filepath.Join(env.wsDir, "files")
+	if got, _ := os.ReadFile(filepath.Join(files, "change.txt")); string(got) != "old" {
+		t.Errorf("workspace change.txt = %q, want it untouched by the job", got)
+	}
+	if _, err := os.Stat(filepath.Join(files, "out.bin")); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("job output leaked into the workspace: %v", err)
+	}
+	if _, err := os.Stat(jobFiles); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("job copy %s not removed: %v", jobFiles, err)
+	}
+	next, err := env.jobs.Submit(env.request())
+	if err != nil {
+		t.Fatalf("expected_hash no longer matches after job: %v", err)
+	}
+	waitFinished(t, env.jobs, next.ID)
 }
 
 func TestJob_SubmitRejects(t *testing.T) {

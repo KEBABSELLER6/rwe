@@ -38,11 +38,11 @@ func (s *JobService) FollowLogs(ctx context.Context, id uuid.UUID, emitLine func
 			if pending, err = emitLines(pending, emitLine); err != nil {
 				return err
 			}
-			if errors.Is(readErr, io.EOF) || n == 0 {
-				break
-			}
-			if readErr != nil {
+			if readErr != nil && !errors.Is(readErr, io.EOF) {
 				return readErr
+			}
+			if n == 0 {
+				break
 			}
 		}
 

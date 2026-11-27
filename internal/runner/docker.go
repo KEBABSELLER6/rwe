@@ -55,8 +55,9 @@ func (d *Docker) Run(ctx context.Context, spec service.RunSpec, logs io.Writer) 
 	case err := <-done:
 		return exitCode(err)
 	case <-ctx.Done():
-		d.remove(spec.Name)
+		cmd.Process.Kill()
 		<-done
+		d.remove(spec.Name)
 		return -1, fmt.Errorf("job %s stopped: %w", spec.Name, ctx.Err())
 	}
 }
