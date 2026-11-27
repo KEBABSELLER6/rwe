@@ -25,9 +25,17 @@ var version = "dev"
 func main() {
 	addr := flag.String("addr", envOr("RWE_ADDR", ":8999"), "listen address (env RWE_ADDR)")
 	dataDir := flag.String("data", envOr("RWE_DATA", "local_data"), "directory for workspaces and job logs (env RWE_DATA)")
+	jobMemory := flag.String("job-memory", envOr("RWE_JOB_MEMORY", ""), "memory cap per job, e.g. 2g; also the default when a job sets none (env RWE_JOB_MEMORY)")
 	flag.Parse()
 
-	if err := run(*addr, *dataDir); err != nil {
+	limits := service.DefaultJobLimits
+	var err error
+	if limits.MaxMemory, err = parseBytes(*jobMemory); err != nil {
+		slog.Error("invalid job memory", "value", *jobMemory, "err", err)
+		os.Exit(2)
+	}
+
+	if err := run(*addr, *dataDir, limits); err != nil {
 		slog.Error("application stopped", "err", err)
 		os.Exit(1)
 	}
@@ -40,7 +48,7 @@ func envOr(key, fallback string) string {
 	return fallback
 }
 
-func run(addr, dataDir string) error {
+func run(addr, dataDir string, limits service.JobLimits) error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
@@ -50,7 +58,7 @@ func run(addr, dataDir string) error {
 	if err != nil {
 		return fmt.Errorf("init workspace service: %w", err)
 	}
-	jobs, err := service.NewJobService(filepath.Join(dataDir, "jobs"), ws, runner.NewDocker())
+	jobs, err := service.NewJobService(filepath.Join(dataDir, "jobs"), ws, runner.NewDocker(), limits)
 	if err != nil {
 		return fmt.Errorf("init job service: %w", err)
 	}
@@ -76,7 +84,7 @@ func run(addr, dataDir string) error {
 
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- srv.Serve(ln) }()
-	logger.Info("server started", "version", version, "addr", ln.Addr().String(), "data", dataDir)
+	logger.Info("server started", "version", version, "addr", ln.Addr().String(), "data", dataDir, "job_memory", limits.MaxMemory)
 
 	var runErr error
 	select {

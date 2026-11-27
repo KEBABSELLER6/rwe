@@ -37,7 +37,7 @@ func newTestClient(t *testing.T) *Client {
 	if err != nil {
 		t.Fatal(err)
 	}
-	jobs, err := service.NewJobService(filepath.Join(data, "jobs"), ws, lsRunner{})
+	jobs, err := service.NewJobService(filepath.Join(data, "jobs"), ws, lsRunner{}, service.DefaultJobLimits)
 	if err != nil {
 		t.Fatal(err)
 	}
