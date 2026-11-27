@@ -20,7 +20,7 @@ func (s *WorkspaceService) PutBlob(ctx context.Context, id uuid.UUID, sum string
 		return 0, fmt.Errorf("%w: invalid sha256 %q", ErrInvalidInput, sum)
 	}
 
-	target, err := manifest.Load(s.targetPath(id))
+	target, err := s.loadTarget(id)
 	if errors.Is(err, fs.ErrNotExist) {
 		return 0, fmt.Errorf("%w: workspace %s has no pending sync", ErrNotFound, id)
 	}
@@ -28,12 +28,13 @@ func (s *WorkspaceService) PutBlob(ctx context.Context, id uuid.UUID, sum string
 		return 0, err
 	}
 
-	paths := pathsWithSum(target, sum)
+	paths := pathsWithSum(target.Files, sum)
 	if len(paths) == 0 {
 		return 0, fmt.Errorf("%w: blob %s was not requested", ErrInvalidInput, sum)
 	}
+	size := target.Sizes[paths[0]]
 
-	blob, err := s.receiveBlob(s.wsDir(id), sum, body)
+	blob, err := s.receiveBlob(s.wsDir(id), sum, size, body)
 	if err != nil {
 		return 0, err
 	}
@@ -50,13 +51,18 @@ func (s *WorkspaceService) PutBlob(ctx context.Context, id uuid.UUID, sum string
 		return 0, err
 	}
 
-	target, err = manifest.Load(s.targetPath(id))
+	target, err = s.loadTarget(id)
 	if err != nil {
 		return 0, err
 	}
-	paths = pathsWithSum(target, sum)
+	paths = pathsWithSum(target.Files, sum)
 	if len(paths) == 0 {
 		return 0, fmt.Errorf("%w: blob %s is no longer requested", ErrInvalidInput, sum)
+	}
+	for _, p := range paths {
+		if target.Sizes[p] != size {
+			return 0, fmt.Errorf("%w: blob %s is %d bytes, %q was declared as %d", ErrInvalidInput, sum, size, p, target.Sizes[p])
+		}
 	}
 
 	current, err := s.loadManifest(id)
@@ -81,7 +87,7 @@ func (s *WorkspaceService) PutBlob(ctx context.Context, id uuid.UUID, sum string
 		return 0, err
 	}
 
-	for p, want := range target {
+	for p, want := range target.Files {
 		if current[p] != want {
 			remaining++
 		}
@@ -100,7 +106,7 @@ func pathsWithSum(m manifest.Manifest, sum string) []string {
 	return paths
 }
 
-func (s *WorkspaceService) receiveBlob(wsDir, sum string, body io.Reader) (string, error) {
+func (s *WorkspaceService) receiveBlob(wsDir, sum string, size int64, body io.Reader) (string, error) {
 	tmp, err := os.CreateTemp(wsDir, ".blob-*")
 	if err != nil {
 		return "", err
@@ -108,7 +114,7 @@ func (s *WorkspaceService) receiveBlob(wsDir, sum string, body io.Reader) (strin
 	name := tmp.Name()
 
 	h := sha256.New()
-	limited := io.LimitReader(body, s.limits.MaxTotalBytes+1)
+	limited := io.LimitReader(body, size+1)
 	n, copyErr := io.Copy(io.MultiWriter(tmp, h), limited)
 	closeErr := tmp.Close()
 
@@ -117,8 +123,8 @@ func (s *WorkspaceService) receiveBlob(wsDir, sum string, body io.Reader) (strin
 		err = fmt.Errorf("%w: reading blob: %w", ErrInvalidInput, copyErr)
 	case closeErr != nil:
 		err = closeErr
-	case n > s.limits.MaxTotalBytes:
-		err = fmt.Errorf("%w: blob exceeds %d bytes", ErrTooLarge, s.limits.MaxTotalBytes)
+	case n != size:
+		err = fmt.Errorf("%w: blob is not the declared %d bytes", ErrInvalidInput, size)
 	case hex.EncodeToString(h.Sum(nil)) != sum:
 		err = fmt.Errorf("%w: content does not match sha256 %s", ErrInvalidInput, sum)
 	}

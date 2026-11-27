@@ -11,7 +11,12 @@ import (
 	"kebabseller6/rwe/internal/manifest"
 )
 
-func (s *WorkspaceService) Sync(ctx context.Context, id uuid.UUID, want manifest.Manifest) ([]string, error) {
+type syncTarget struct {
+	Files manifest.Manifest `json:"files"`
+	Sizes map[string]int64  `json:"sizes"`
+}
+
+func (s *WorkspaceService) Sync(ctx context.Context, id uuid.UUID, want manifest.Manifest, sizes map[string]int64) ([]string, error) {
 	s.manifestMu.Lock()
 	defer s.manifestMu.Unlock()
 
@@ -33,6 +38,10 @@ func (s *WorkspaceService) Sync(ctx context.Context, id uuid.UUID, want manifest
 		return nil, err
 	}
 	defer root.Close()
+
+	if err := checkTotalSize(root, current, want, sizes, s.limits); err != nil {
+		return nil, err
+	}
 
 	for p := range current {
 		if _, keep := want[p]; keep {
@@ -56,7 +65,7 @@ func (s *WorkspaceService) Sync(ctx context.Context, id uuid.UUID, want manifest
 	}
 	slices.Sort(missing)
 
-	if err := writeJSON(s.targetPath(id), want); err != nil {
+	if err := writeJSON(s.targetPath(id), syncTarget{Files: want, Sizes: sizes}); err != nil {
 		return nil, err
 	}
 
@@ -83,6 +92,27 @@ func validateManifest(m manifest.Manifest, lim Limits) error {
 				return fmt.Errorf("%w: %q is both a file and a directory", ErrInvalidInput, dir)
 			}
 		}
+	}
+	return nil
+}
+
+func checkTotalSize(root *os.Root, current, want manifest.Manifest, sizes map[string]int64, lim Limits) error {
+	var total int64
+	for p, sum := range want {
+		size, declared := sizes[p]
+		if current[p] == sum {
+			fi, err := root.Stat(p)
+			if err != nil {
+				return err
+			}
+			size = fi.Size()
+		} else if !declared || size < 0 {
+			return fmt.Errorf("%w: missing or negative size for %q", ErrInvalidInput, p)
+		}
+		if size > lim.MaxTotalBytes-total {
+			return fmt.Errorf("%w: workspace would exceed %d bytes", ErrTooLarge, lim.MaxTotalBytes)
+		}
+		total += size
 	}
 	return nil
 }

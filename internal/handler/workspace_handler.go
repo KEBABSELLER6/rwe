@@ -11,6 +11,7 @@ var maxUploadBytes = service.DefaultLimits.MaxTotalBytes
 
 type SyncRequest struct {
 	Files manifest.Manifest `json:"files"`
+	Sizes map[string]int64  `json:"sizes"`
 }
 
 type SyncResponse struct {
@@ -69,7 +70,7 @@ func (h *WorkspaceHandler) HandleSync(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	missing, err := h.s.Sync(r.Context(), id, req.Files)
+	missing, err := h.s.Sync(r.Context(), id, req.Files, req.Sizes)
 	if err != nil {
 		h.eh.HandleError(w, r, err)
 		return

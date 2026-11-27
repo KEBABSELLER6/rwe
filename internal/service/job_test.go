@@ -128,7 +128,7 @@ func TestJob_Statuses(t *testing.T) {
 				t.Error("start/finish time not set")
 			}
 
-			if _, err := env.ws.Sync(t.Context(), env.wsID, manifest.Manifest{}); err != nil {
+			if _, err := env.ws.Sync(t.Context(), env.wsID, manifest.Manifest{}, nil); err != nil {
 				t.Errorf("workspace not released after job: %v", err)
 			}
 		})
@@ -170,7 +170,7 @@ func TestJob_WorkspaceBusyWhileQueuedOrRunning(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := env.ws.Sync(t.Context(), env.wsID, manifest.Manifest{}); !errors.Is(err, ErrConflict) {
+	if _, err := env.ws.Sync(t.Context(), env.wsID, manifest.Manifest{}, nil); !errors.Is(err, ErrConflict) {
 		t.Errorf("sync during job: err = %v, want ErrConflict", err)
 	}
 	if _, err := env.jobs.Submit(env.request()); !errors.Is(err, ErrConflict) {
@@ -247,7 +247,7 @@ func TestJob_SubmitRejects(t *testing.T) {
 			if _, err := env.jobs.Submit(req); !errors.Is(err, tt.wantErr) {
 				t.Fatalf("err = %v, want %v", err, tt.wantErr)
 			}
-			if _, err := env.ws.Sync(t.Context(), env.wsID, manifest.Manifest{"keep.txt": sha("keep")}); err != nil {
+			if _, err := env.ws.Sync(t.Context(), env.wsID, manifest.Manifest{"keep.txt": sha("keep")}, nil); err != nil {
 				t.Errorf("rejected submit left workspace locked: %v", err)
 			}
 			env.hash = manifest.Manifest{"keep.txt": sha("keep")}.Hash()
@@ -281,7 +281,7 @@ func TestJob_QueueFull(t *testing.T) {
 			if !errors.Is(err, ErrConflict) {
 				t.Fatalf("submit beyond queue size: err = %v, want ErrConflict", err)
 			}
-			if _, err := env.ws.Sync(t.Context(), env.wsID, manifest.Manifest{}); err != nil {
+			if _, err := env.ws.Sync(t.Context(), env.wsID, manifest.Manifest{}, nil); err != nil {
 				t.Errorf("rejected job left workspace locked: %v", err)
 			}
 		}
@@ -401,7 +401,7 @@ func TestJob_CancelRunning(t *testing.T) {
 	if got := waitFinished(t, env.jobs, job.ID); got.Status != JobCancelled {
 		t.Errorf("status = %s, want cancelled", got.Status)
 	}
-	if _, err := env.ws.Sync(t.Context(), env.wsID, manifest.Manifest{}); err != nil {
+	if _, err := env.ws.Sync(t.Context(), env.wsID, manifest.Manifest{}, nil); err != nil {
 		t.Errorf("workspace not released after cancel: %v", err)
 	}
 }
@@ -420,7 +420,7 @@ func TestJob_CancelQueued(t *testing.T) {
 	if got, err := jobs.Cancel(job.ID); err != nil || got.Status != JobCancelled {
 		t.Fatalf("cancel = %s, %v; want cancelled", got.Status, err)
 	}
-	if _, err := env.ws.Sync(t.Context(), env.wsID, manifest.Manifest{}); err != nil {
+	if _, err := env.ws.Sync(t.Context(), env.wsID, manifest.Manifest{}, nil); err != nil {
 		t.Errorf("workspace not released after cancel: %v", err)
 	}
 

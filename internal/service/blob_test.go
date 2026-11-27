@@ -12,25 +12,36 @@ import (
 	"kebabseller6/rwe/internal/manifest"
 )
 
-func syncTo(t *testing.T, s *WorkspaceService, id uuid.UUID, want manifest.Manifest) {
+func syncTo(t *testing.T, s *WorkspaceService, id uuid.UUID, contents map[string]string) manifest.Manifest {
 	t.Helper()
-	if _, err := s.Sync(t.Context(), id, want); err != nil {
+	want, sizes := manifestOf(contents)
+	if _, err := s.Sync(t.Context(), id, want, sizes); err != nil {
 		t.Fatal(err)
 	}
+	return want
+}
+
+func manifestOf(contents map[string]string) (manifest.Manifest, map[string]int64) {
+	m := manifest.Manifest{}
+	sizes := map[string]int64{}
+	for p, c := range contents {
+		m[p] = sha(c)
+		sizes[p] = int64(len(c))
+	}
+	return m, sizes
 }
 
 func TestPutBlob(t *testing.T) {
 	s, wsDir, id := newSyncedWorkspace(t)
 	files := filepath.Join(wsDir, "files")
 
-	want := manifest.Manifest{
-		"keep.txt":       sha("keep"),
-		"change.txt":     sha("new"),
-		"copy/one.txt":   sha("same"),
-		"copy/two.txt":   sha("same"),
-		"deep/a/b/c.txt": sha("deep"),
-	}
-	syncTo(t, s, id, want)
+	want := syncTo(t, s, id, map[string]string{
+		"keep.txt":       "keep",
+		"change.txt":     "new",
+		"copy/one.txt":   "same",
+		"copy/two.txt":   "same",
+		"deep/a/b/c.txt": "deep",
+	})
 
 	uploads := []struct {
 		content       string
@@ -84,7 +95,7 @@ func TestPutBlob_KeepsExecutableBit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	syncTo(t, s, ws.ID, manifest.Manifest{"run.sh": sha("v2")})
+	syncTo(t, s, ws.ID, map[string]string{"run.sh": "v2"})
 	if _, err := s.PutBlob(t.Context(), ws.ID, sha("v2"), strings.NewReader("v2")); err != nil {
 		t.Fatal(err)
 	}
@@ -101,12 +112,12 @@ func TestPutBlob_KeepsExecutableBit(t *testing.T) {
 func TestPutBlob_Parallel(t *testing.T) {
 	s, wsDir, id := newSyncedWorkspace(t)
 
-	want := manifest.Manifest{}
+	files := map[string]string{}
 	contents := []string{"a", "b", "c", "d", "e", "f", "g", "h"}
 	for _, c := range contents {
-		want["parallel/"+c] = sha(c)
+		files["parallel/"+c] = c
 	}
-	syncTo(t, s, id, want)
+	want := syncTo(t, s, id, files)
 
 	var wg sync.WaitGroup
 	for _, c := range contents {
@@ -132,21 +143,22 @@ func TestPutBlob_Rejects(t *testing.T) {
 		name    string
 		sum     string
 		body    string
-		limit   int64
+		size    int64
 		wantErr error
 	}{
-		{name: "invalid sha", sum: "nothex", body: "new", wantErr: ErrInvalidInput},
-		{name: "content mismatch", sum: sha("new"), body: "evil", wantErr: ErrInvalidInput},
-		{name: "not requested", sum: sha("other"), body: "other", wantErr: ErrInvalidInput},
-		{name: "too large", sum: sha("new"), body: "new", limit: 2, wantErr: ErrTooLarge},
+		{name: "invalid sha", sum: "nothex", body: "new", size: 3, wantErr: ErrInvalidInput},
+		{name: "content mismatch", sum: sha("new"), body: "evil", size: 3, wantErr: ErrInvalidInput},
+		{name: "not requested", sum: sha("other"), body: "other", size: 3, wantErr: ErrInvalidInput},
+		{name: "larger than declared", sum: sha("new"), body: "new", size: 2, wantErr: ErrInvalidInput},
+		{name: "smaller than declared", sum: sha("new"), body: "new", size: 4, wantErr: ErrInvalidInput},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s, wsDir, id := newSyncedWorkspace(t)
-			syncTo(t, s, id, manifest.Manifest{"change.txt": sha("new")})
-			if tt.limit > 0 {
-				s.limits.MaxTotalBytes = tt.limit
+			want := manifest.Manifest{"change.txt": sha("new")}
+			if _, err := s.Sync(t.Context(), id, want, map[string]int64{"change.txt": tt.size}); err != nil {
+				t.Fatal(err)
 			}
 
 			_, err := s.PutBlob(t.Context(), id, tt.sum, strings.NewReader(tt.body))

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -61,6 +62,18 @@ func (s *WorkspaceService) manifestPath(id uuid.UUID) string {
 
 func (s *WorkspaceService) targetPath(id uuid.UUID) string {
 	return filepath.Join(s.wsDir(id), targetFile)
+}
+
+func (s *WorkspaceService) loadTarget(id uuid.UUID) (syncTarget, error) {
+	var t syncTarget
+	raw, err := os.ReadFile(s.targetPath(id))
+	if err != nil {
+		return t, err
+	}
+	if err := json.Unmarshal(raw, &t); err != nil {
+		return t, fmt.Errorf("corrupt sync target: %w", err)
+	}
+	return t, nil
 }
 
 func (s *WorkspaceService) loadManifest(id uuid.UUID) (manifest.Manifest, error) {
