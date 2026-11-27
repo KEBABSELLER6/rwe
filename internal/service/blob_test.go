@@ -12,10 +12,10 @@ import (
 	"kebabseller6/rwe/internal/manifest"
 )
 
-func syncTo(t *testing.T, s *WorkspaceService, id uuid.UUID, contents map[string]string) manifest.Manifest {
+func syncTo(t *testing.T, s *WorkspaceService, id uuid.UUID, contents map[string]string, executable ...string) manifest.Manifest {
 	t.Helper()
 	want, sizes := manifestOf(contents)
-	if _, err := s.Sync(t.Context(), id, want, sizes); err != nil {
+	if _, err := s.Sync(t.Context(), id, want, sizes, executable); err != nil {
 		t.Fatal(err)
 	}
 	return want
@@ -84,28 +84,38 @@ func TestPutBlob(t *testing.T) {
 	assertNoBlobTemps(t, wsDir)
 }
 
-func TestPutBlob_KeepsExecutableBit(t *testing.T) {
+func TestPutBlob_SetsModeFromSync(t *testing.T) {
 	dir := t.TempDir()
 	s, err := NewWorkspaceService(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	ws, err := s.Create(t.Context(), makeTarGz(t, []entry{{name: "run.sh", body: "v1", mode: 0o755}}))
+	ws, err := s.Create(t.Context(), makeTarGz(t, []entry{
+		{name: "was-exec.sh", body: "v1", mode: 0o755},
+		{name: "becomes-exec.sh", body: "v1", mode: 0o644},
+	}))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	syncTo(t, s, ws.ID, map[string]string{"run.sh": "v2"})
+	syncTo(t, s, ws.ID, map[string]string{"was-exec.sh": "v2", "becomes-exec.sh": "v2"}, "becomes-exec.sh")
 	if _, err := s.PutBlob(t.Context(), ws.ID, sha("v2"), strings.NewReader("v2")); err != nil {
 		t.Fatal(err)
 	}
 
-	fi, err := os.Stat(filepath.Join(dir, ws.ID.String(), "files", "run.sh"))
+	files := filepath.Join(dir, ws.ID.String(), "files")
+	assertPerm(t, filepath.Join(files, "was-exec.sh"), 0o644)
+	assertPerm(t, filepath.Join(files, "becomes-exec.sh"), 0o755)
+}
+
+func assertPerm(t *testing.T, name string, want os.FileMode) {
+	t.Helper()
+	fi, err := os.Stat(name)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if fi.Mode().Perm() != 0o755 {
-		t.Errorf("run.sh mode = %v, want 0755", fi.Mode().Perm())
+	if fi.Mode().Perm() != want {
+		t.Errorf("%s mode = %v, want %v", filepath.Base(name), fi.Mode().Perm(), want)
 	}
 }
 
@@ -157,7 +167,7 @@ func TestPutBlob_Rejects(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			s, wsDir, id := newSyncedWorkspace(t)
 			want := manifest.Manifest{"change.txt": sha("new")}
-			if _, err := s.Sync(t.Context(), id, want, map[string]int64{"change.txt": tt.size}); err != nil {
+			if _, err := s.Sync(t.Context(), id, want, map[string]int64{"change.txt": tt.size}, nil); err != nil {
 				t.Fatal(err)
 			}
 

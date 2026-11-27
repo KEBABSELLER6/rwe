@@ -12,11 +12,12 @@ import (
 )
 
 type syncTarget struct {
-	Files manifest.Manifest `json:"files"`
-	Sizes map[string]int64  `json:"sizes"`
+	Files      manifest.Manifest `json:"files"`
+	Sizes      map[string]int64  `json:"sizes"`
+	Executable []string          `json:"executable"`
 }
 
-func (s *WorkspaceService) Sync(ctx context.Context, id uuid.UUID, want manifest.Manifest, sizes map[string]int64) ([]string, error) {
+func (s *WorkspaceService) Sync(ctx context.Context, id uuid.UUID, want manifest.Manifest, sizes map[string]int64, executable []string) ([]string, error) {
 	s.manifestMu.Lock()
 	defer s.manifestMu.Unlock()
 
@@ -31,6 +32,11 @@ func (s *WorkspaceService) Sync(ctx context.Context, id uuid.UUID, want manifest
 
 	if err := validateManifest(want, s.limits); err != nil {
 		return nil, err
+	}
+	for _, p := range executable {
+		if _, ok := want[p]; !ok {
+			return nil, fmt.Errorf("%w: executable %q is not in files", ErrInvalidInput, p)
+		}
 	}
 
 	root, err := os.OpenRoot(s.filesDir(id))
@@ -57,15 +63,20 @@ func (s *WorkspaceService) Sync(ctx context.Context, id uuid.UUID, want manifest
 		return nil, err
 	}
 
+	isExec := toSet(executable)
 	missing := []string{}
 	for p, sum := range want {
 		if current[p] != sum {
 			missing = append(missing, p)
+			continue
+		}
+		if err := setExecutable(root, p, isExec[p]); err != nil {
+			return nil, fmt.Errorf("chmod %q: %w", p, err)
 		}
 	}
 	slices.Sort(missing)
 
-	if err := writeJSON(s.targetPath(id), syncTarget{Files: want, Sizes: sizes}); err != nil {
+	if err := writeJSON(s.targetPath(id), syncTarget{Files: want, Sizes: sizes, Executable: executable}); err != nil {
 		return nil, err
 	}
 
@@ -115,4 +126,30 @@ func checkTotalSize(root *os.Root, current, want manifest.Manifest, sizes map[st
 		total += size
 	}
 	return nil
+}
+
+func setExecutable(root *os.Root, name string, executable bool) error {
+	fi, err := root.Stat(name)
+	if err != nil {
+		return err
+	}
+	if (fi.Mode()&0o111 != 0) == executable {
+		return nil
+	}
+	return root.Chmod(name, filePerm(executable))
+}
+
+func filePerm(executable bool) os.FileMode {
+	if executable {
+		return 0o755
+	}
+	return 0o644
+}
+
+func toSet(items []string) map[string]bool {
+	set := make(map[string]bool, len(items))
+	for _, item := range items {
+		set[item] = true
+	}
+	return set
 }

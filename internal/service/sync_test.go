@@ -45,7 +45,7 @@ func TestSync(t *testing.T) {
 		"new/file.go": "package new",
 	})
 
-	missing, err := s.Sync(t.Context(), id, want, sizes)
+	missing, err := s.Sync(t.Context(), id, want, sizes, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +92,7 @@ func TestSync_NoChanges(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	missing, err := s.Sync(t.Context(), id, current, nil)
+	missing, err := s.Sync(t.Context(), id, current, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,7 +123,7 @@ func TestSync_Rejects(t *testing.T) {
 			s, wsDir, id := newSyncedWorkspace(t)
 			before, _ := os.ReadFile(filepath.Join(wsDir, "manifest.json"))
 
-			_, err := s.Sync(t.Context(), id, tt.want, nil)
+			_, err := s.Sync(t.Context(), id, tt.want, nil, nil)
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("err = %v, want %v", err, tt.wantErr)
 			}
@@ -136,11 +136,46 @@ func TestSync_Rejects(t *testing.T) {
 	}
 }
 
+func TestSync_ChangesModeWithoutUpload(t *testing.T) {
+	s, wsDir, id := newSyncedWorkspace(t)
+	current, err := manifest.Load(filepath.Join(wsDir, "manifest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	keep := filepath.Join(wsDir, "files", "keep.txt")
+
+	for _, step := range []struct {
+		executable []string
+		wantPerm   os.FileMode
+	}{
+		{[]string{"keep.txt"}, 0o755},
+		{nil, 0o644},
+	} {
+		missing, err := s.Sync(t.Context(), id, current, nil, step.executable)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(missing) != 0 {
+			t.Errorf("missing = %v, want none for a mode-only change", missing)
+		}
+		assertPerm(t, keep, step.wantPerm)
+	}
+}
+
+func TestSync_RejectsUnknownExecutable(t *testing.T) {
+	s, _, id := newSyncedWorkspace(t)
+
+	_, err := s.Sync(t.Context(), id, manifest.Manifest{}, nil, []string{"keep.txt"})
+	if !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("err = %v, want ErrInvalidInput", err)
+	}
+}
+
 func TestSync_TooManyFiles(t *testing.T) {
 	s, _, id := newSyncedWorkspace(t)
 	s.limits.MaxFiles = 1
 
-	_, err := s.Sync(t.Context(), id, manifest.Manifest{"a": sha("a"), "b": sha("b")}, nil)
+	_, err := s.Sync(t.Context(), id, manifest.Manifest{"a": sha("a"), "b": sha("b")}, nil, nil)
 	if !errors.Is(err, ErrTooLarge) {
 		t.Fatalf("err = %v, want ErrTooLarge", err)
 	}
@@ -169,7 +204,7 @@ func TestSync_TotalSize(t *testing.T) {
 			s.limits.MaxTotalBytes = 100
 			before, _ := os.ReadFile(filepath.Join(wsDir, "manifest.json"))
 
-			_, err := s.Sync(t.Context(), id, tt.want, tt.sizes)
+			_, err := s.Sync(t.Context(), id, tt.want, tt.sizes, nil)
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("err = %v, want %v", err, tt.wantErr)
 			}
@@ -188,7 +223,7 @@ func TestSync_UnknownWorkspace(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = s.Sync(t.Context(), uuid.NewV7(), manifest.Manifest{}, nil)
+	_, err = s.Sync(t.Context(), uuid.NewV7(), manifest.Manifest{}, nil, nil)
 	if !errors.Is(err, ErrNotFound) {
 		t.Fatalf("err = %v, want ErrNotFound", err)
 	}
