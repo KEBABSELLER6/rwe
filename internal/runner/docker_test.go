@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -141,5 +142,50 @@ func TestDocker_CachesAreWritableAndKept(t *testing.T) {
 		if _, err := os.Stat(p); err != nil {
 			t.Errorf("cache file not kept on host: %v", err)
 		}
+	}
+}
+
+func TestDocker_CommandExitCodesDockerAlsoUses(t *testing.T) {
+	requireDocker(t)
+	for _, want := range []int{125, 126, 127} {
+		s := spec(t.TempDir(), "sh", "-c", fmt.Sprintf("exit %d", want))
+
+		var logs bytes.Buffer
+		code, err := NewDocker().Run(t.Context(), s, &logs)
+		if err != nil || code != want {
+			t.Errorf("Run = %d, %v; want %d, nil\nlogs:\n%s", code, err, want, logs.String())
+		}
+		if exec.Command("docker", "inspect", s.Name).Run() == nil {
+			t.Errorf("container %s still exists", s.Name)
+		}
+	}
+}
+
+func TestDocker_MissingCommandIsExit127(t *testing.T) {
+	requireDocker(t)
+	s := spec(t.TempDir(), "/does-not-exist")
+
+	var logs bytes.Buffer
+	code, err := NewDocker().Run(t.Context(), s, &logs)
+	if err != nil || code != 127 {
+		t.Fatalf("Run = %d, %v; want 127, nil like a shell\nlogs:\n%s", code, err, logs.String())
+	}
+}
+
+func TestDocker_FailedStartIsError(t *testing.T) {
+	requireDocker(t)
+	s := spec(t.TempDir(), "true")
+	s.Caches = []service.CacheMount{{HostDir: filepath.Join(t.TempDir(), "file"), Path: "/proc/nope"}}
+	if err := os.WriteFile(s.Caches[0].HostDir, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var logs bytes.Buffer
+	code, err := NewDocker().Run(t.Context(), s, &logs)
+	if err == nil {
+		t.Fatalf("Run = %d, nil; want an error for a container that cannot start\nlogs:\n%s", code, logs.String())
+	}
+	if exec.Command("docker", "inspect", s.Name).Run() == nil {
+		t.Errorf("container %s still exists", s.Name)
 	}
 }
