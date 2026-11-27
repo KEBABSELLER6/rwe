@@ -75,3 +75,14 @@ func TestConfigRejectsTypos(t *testing.T) {
 		t.Fatalf("err = %v, want an error naming %s", err, projectConfigFile)
 	}
 }
+
+func TestConfigCachesFromProjectReplaceUser(t *testing.T) {
+	dir := setup(t, `{"caches": ["/tmp/user"]}`, `{"caches": ["/tmp/.cache/go-build"]}`)
+	cfg, err := loadConfig(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Caches) != 1 || cfg.Caches[0] != "/tmp/.cache/go-build" {
+		t.Fatalf("caches = %v, want the project's list", cfg.Caches)
+	}
+}

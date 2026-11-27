@@ -53,7 +53,7 @@ func serveMCP(ctx context.Context, cfg config) error {
 			}
 
 			var tail lineTail
-			spec := client.JobSpec{Image: args.Image, Command: []string{"sh", "-c", args.Command}, TimeoutSeconds: args.TimeoutSeconds}
+			spec := client.JobSpec{Image: args.Image, Command: []string{"sh", "-c", args.Command}, TimeoutSeconds: args.TimeoutSeconds, Caches: cfg.Caches}
 			job, err := c.Run(ctx, cfg.dir, spec, tail.add)
 			if err != nil {
 				return "", err

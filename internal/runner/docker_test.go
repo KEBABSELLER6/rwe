@@ -108,3 +108,38 @@ func TestDocker_BadImageIsError(t *testing.T) {
 		t.Fatalf("expected error for missing image, logs:\n%s", logs.String())
 	}
 }
+
+func TestDocker_CacheMountArgs(t *testing.T) {
+	s := spec("files", "true")
+	s.Caches = []service.CacheMount{{HostDir: "/data/caches/shared/abc", Path: "/tmp/.cache"}}
+	args, err := runArgs(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(strings.Join(args, " "), "--volume /data/caches/shared/abc:/tmp/.cache") {
+		t.Errorf("args = %v, want the cache volume", args)
+	}
+}
+
+func TestDocker_CachesAreWritableAndKept(t *testing.T) {
+	requireDocker(t)
+	files, shared, inWorkspace := t.TempDir(), t.TempDir(), t.TempDir()
+	if err := os.Mkdir(filepath.Join(files, "node_modules"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	s := spec(files, "sh", "-c", "echo a > /tmp/.cache/x && echo b > node_modules/y")
+	s.Caches = []service.CacheMount{
+		{HostDir: shared, Path: "/tmp/.cache"},
+		{HostDir: inWorkspace, Path: service.WorkspaceMount + "/node_modules"},
+	}
+
+	var logs bytes.Buffer
+	if code, err := NewDocker().Run(t.Context(), s, &logs); err != nil || code != 0 {
+		t.Fatalf("Run = %d, %v\nlogs:\n%s", code, err, logs.String())
+	}
+	for _, p := range []string{filepath.Join(shared, "x"), filepath.Join(inWorkspace, "y")} {
+		if _, err := os.Stat(p); err != nil {
+			t.Errorf("cache file not kept on host: %v", err)
+		}
+	}
+}

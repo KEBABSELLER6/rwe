@@ -63,7 +63,7 @@ func run(addr, dataDir string, limits service.JobLimits) error {
 	if err != nil {
 		return fmt.Errorf("init workspace service: %w", err)
 	}
-	jobs, err := service.NewJobService(filepath.Join(dataDir, "jobs"), ws, runner.NewDocker(), limits)
+	jobs, err := service.NewJobService(filepath.Join(dataDir, "jobs"), filepath.Join(dataDir, "caches"), ws, runner.NewDocker(), limits)
 	if err != nil {
 		return fmt.Errorf("init job service: %w", err)
 	}

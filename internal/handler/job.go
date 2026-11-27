@@ -27,6 +27,7 @@ type JobRequest struct {
 	TimeoutSeconds int      `json:"timeout_seconds"`
 	MemoryBytes    int64    `json:"memory_bytes"`
 	CPUs           float64  `json:"cpus"`
+	Caches         []string `json:"caches"`
 }
 
 func (h *JobHandler) HandleSubmit(w http.ResponseWriter, r *http.Request) {
@@ -50,6 +51,7 @@ func (h *JobHandler) HandleSubmit(w http.ResponseWriter, r *http.Request) {
 		Timeout:      time.Duration(jr.TimeoutSeconds) * time.Second,
 		Memory:       jr.MemoryBytes,
 		CPUs:         jr.CPUs,
+		Caches:       jr.Caches,
 	}
 
 	j, err := h.s.Submit(req)
