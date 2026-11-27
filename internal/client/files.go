@@ -76,30 +76,33 @@ func walkFiles(dir string) ([]string, error) {
 	return files, err
 }
 
-func BuildManifest(dir string, files []string) (manifest.Manifest, error) {
+func BuildManifest(dir string, files []string) (manifest.Manifest, map[string]int64, error) {
 	m := manifest.Manifest{}
+	sizes := map[string]int64{}
 	for _, f := range files {
-		sum, err := hashFile(filepath.Join(dir, f))
+		sum, size, err := hashFile(filepath.Join(dir, f))
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		m[f] = sum
+		sizes[f] = size
 	}
-	return m, nil
+	return m, sizes, nil
 }
 
-func hashFile(path string) (string, error) {
+func hashFile(path string) (string, int64, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 	defer f.Close()
 
 	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return "", err
+	n, err := io.Copy(h, f)
+	if err != nil {
+		return "", 0, err
 	}
-	return hex.EncodeToString(h.Sum(nil)), nil
+	return hex.EncodeToString(h.Sum(nil)), n, nil
 }
 
 func writeTarball(w io.Writer, dir string, files []string) error {

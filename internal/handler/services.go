@@ -10,7 +10,7 @@ import (
 
 type WorkspaceService interface {
 	Create(ctx context.Context, body io.Reader) (service.Workspace, error)
-	Sync(ctx context.Context, id uuid.UUID, body manifest.Manifest) ([]string, error)
+	Sync(ctx context.Context, id uuid.UUID, files manifest.Manifest, sizes map[string]int64) ([]string, error)
 	PutBlob(ctx context.Context, id uuid.UUID, sum string, body io.Reader) (int, error)
 }
 

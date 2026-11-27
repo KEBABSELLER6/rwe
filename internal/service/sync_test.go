@@ -2,6 +2,8 @@ package service
 
 import (
 	"errors"
+	"maps"
+	"math"
 	"os"
 	"path/filepath"
 	"slices"
@@ -36,14 +38,14 @@ func TestSync(t *testing.T) {
 	s, wsDir, id := newSyncedWorkspace(t)
 	files := filepath.Join(wsDir, "files")
 
-	want := manifest.Manifest{
-		"keep.txt":    sha("keep"),
-		"change.txt":  sha("new"),
-		"half/b.txt":  sha("b"),
-		"new/file.go": sha("package new"),
-	}
+	want, sizes := manifestOf(map[string]string{
+		"keep.txt":    "keep",
+		"change.txt":  "new",
+		"half/b.txt":  "b",
+		"new/file.go": "package new",
+	})
 
-	missing, err := s.Sync(t.Context(), id, want)
+	missing, err := s.Sync(t.Context(), id, want, sizes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,12 +76,12 @@ func TestSync(t *testing.T) {
 		t.Errorf("manifest.json = %v, want %v", current, wantCurrent)
 	}
 
-	target, err := manifest.Load(filepath.Join(wsDir, "target.json"))
+	target, err := s.loadTarget(id)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if target.Hash() != want.Hash() {
-		t.Errorf("target.json = %v, want %v", target, want)
+	if target.Files.Hash() != want.Hash() || !maps.Equal(target.Sizes, sizes) {
+		t.Errorf("target.json = %+v, want files %v, sizes %v", target, want, sizes)
 	}
 }
 
@@ -90,7 +92,7 @@ func TestSync_NoChanges(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	missing, err := s.Sync(t.Context(), id, current)
+	missing, err := s.Sync(t.Context(), id, current, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,7 +123,7 @@ func TestSync_Rejects(t *testing.T) {
 			s, wsDir, id := newSyncedWorkspace(t)
 			before, _ := os.ReadFile(filepath.Join(wsDir, "manifest.json"))
 
-			_, err := s.Sync(t.Context(), id, tt.want)
+			_, err := s.Sync(t.Context(), id, tt.want, nil)
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("err = %v, want %v", err, tt.wantErr)
 			}
@@ -138,9 +140,45 @@ func TestSync_TooManyFiles(t *testing.T) {
 	s, _, id := newSyncedWorkspace(t)
 	s.limits.MaxFiles = 1
 
-	_, err := s.Sync(t.Context(), id, manifest.Manifest{"a": sha("a"), "b": sha("b")})
+	_, err := s.Sync(t.Context(), id, manifest.Manifest{"a": sha("a"), "b": sha("b")}, nil)
 	if !errors.Is(err, ErrTooLarge) {
 		t.Fatalf("err = %v, want ErrTooLarge", err)
+	}
+}
+
+func TestSync_TotalSize(t *testing.T) {
+	big := map[string]int64{"new.bin": 90}
+	tests := []struct {
+		name    string
+		want    manifest.Manifest
+		sizes   map[string]int64
+		wantErr error
+	}{
+		{"fits with kept files", manifest.Manifest{"keep.txt": sha("keep"), "new.bin": sha("x")}, big, nil},
+		{"kept files count", manifest.Manifest{"keep.txt": sha("keep"), "half/b.txt": sha("b"), "new.bin": sha("x")}, map[string]int64{"new.bin": 96}, ErrTooLarge},
+		{"one file too big", manifest.Manifest{"new.bin": sha("x")}, map[string]int64{"new.bin": 101}, ErrTooLarge},
+		{"same blob at many paths", manifest.Manifest{"a": sha("x"), "b": sha("x")}, map[string]int64{"a": 60, "b": 60}, ErrTooLarge},
+		{"no overflow", manifest.Manifest{"a": sha("x"), "b": sha("y")}, map[string]int64{"a": 50, "b": math.MaxInt64}, ErrTooLarge},
+		{"size missing", manifest.Manifest{"new.bin": sha("x")}, nil, ErrInvalidInput},
+		{"negative size", manifest.Manifest{"new.bin": sha("x")}, map[string]int64{"new.bin": -1}, ErrInvalidInput},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s, wsDir, id := newSyncedWorkspace(t)
+			s.limits.MaxTotalBytes = 100
+			before, _ := os.ReadFile(filepath.Join(wsDir, "manifest.json"))
+
+			_, err := s.Sync(t.Context(), id, tt.want, tt.sizes)
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("err = %v, want %v", err, tt.wantErr)
+			}
+
+			after, _ := os.ReadFile(filepath.Join(wsDir, "manifest.json"))
+			if tt.wantErr != nil && string(before) != string(after) {
+				t.Error("rejected sync modified the workspace")
+			}
+		})
 	}
 }
 
@@ -150,7 +188,7 @@ func TestSync_UnknownWorkspace(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = s.Sync(t.Context(), uuid.NewV7(), manifest.Manifest{})
+	_, err = s.Sync(t.Context(), uuid.NewV7(), manifest.Manifest{}, nil)
 	if !errors.Is(err, ErrNotFound) {
 		t.Fatalf("err = %v, want ErrNotFound", err)
 	}
