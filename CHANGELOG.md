@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.0](https://github.com/KEBABSELLER6/rwe/compare/v0.4.0...v0.5.0) (2026-11-28)
+
+
+### Features
+
+* macOS client binaries and install docs ([6a1be28](https://github.com/KEBABSELLER6/rwe/commit/6a1be28d93c6a20d53559a1241c738059ef0e851))
+* macOS client binaries in releases ([45cd3c7](https://github.com/KEBABSELLER6/rwe/commit/45cd3c751e57edd1ad803284cff562abda77fdb7))
+
 ## [0.4.0](https://github.com/KEBABSELLER6/rwe/compare/v0.3.0...v0.4.0) (2026-11-28)
 
 
