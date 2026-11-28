@@ -75,7 +75,18 @@ func run(addr, dataDir string, limits service.JobLimits, workspaceRetention time
 	if err != nil {
 		return fmt.Errorf("init workspace service: %w", err)
 	}
-	jobs, err := service.NewJobService(filepath.Join(dataDir, "jobs"), filepath.Join(dataDir, "caches"), ws, runner.NewDocker(), limits)
+	owner, err := filepath.Abs(dataDir)
+	if err != nil {
+		return fmt.Errorf("resolve data dir: %w", err)
+	}
+	docker := runner.NewDocker(owner)
+	if removed, err := docker.RemoveStale(ctx); err != nil {
+		logger.Warn("remove containers left by a previous run", "err", err)
+	} else if removed > 0 {
+		logger.Info("removed containers left by a previous run", "count", removed)
+	}
+
+	jobs, err := service.NewJobService(filepath.Join(dataDir, "jobs"), filepath.Join(dataDir, "caches"), ws, docker, limits)
 	if err != nil {
 		return fmt.Errorf("init job service: %w", err)
 	}
