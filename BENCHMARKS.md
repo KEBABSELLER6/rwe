@@ -83,3 +83,27 @@ yargs's `prepare` script, which takes 3.3s whatever is cached.
 - `node_modules` is 128 MB per workspace for yargs; the npm cache is 27 MB.
 - The very first job took 72.3s because the box was pulling `node:24`; that happens once per
   image and is left out above.
+
+## Node (pnpm)
+
+yargs at `9588a76` as in [Node (npm)](#node-npm), set up as a pnpm project: `packageManager` set to
+`pnpm@12.23.0`, `pnpm-lock.yaml` created with `pnpm import`, `storeDir` in `pnpm-workspace.yaml`,
+and both files in `.prettierignore`. Command
+`corepack pnpm install --frozen-lockfile && corepack pnpm test`, image `node:24`.
+
+| Case | `caches` | Install time | Job time | Runs |
+|---|---|---|---|---|
+| No cache | none | 18.0–18.3s | 46.5–47.2s | 3 |
+| First run with cache (fills it) | `/tmp/.cache`, `/tmp/.local/share/pnpm` | 28.0s | 51.9s | 1 |
+| Warm | same | 4.2s | 27.3–27.7s | 3 |
+| First run with `node_modules` cached | same and `/workspace/node_modules` | 4.2s | 27.2s | 1 |
+| Warm | same | 0.17s | 23.2–23.6s | 3 |
+
+- Without a cache, every job downloads pnpm through corepack as well as the packages.
+- Filling the store costs about 10s once, on top of the uncached install.
+- With `node_modules` up to date, pnpm skips the install and the `prepare` script; `pretest`
+  still compiles, so the tests take the same 19.5s.
+- `node_modules` is 130 MB per workspace. The shared caches are 114 MB of store, 89 MB of
+  metadata and 74 MB of corepack's copy of pnpm.
+- Measured in a fresh workspace: a `node_modules` cache left over from npm keeps npm's packages
+  around (pnpm moves them aside as `.ignored_*`), so delete `.rwe/workspace` after switching.

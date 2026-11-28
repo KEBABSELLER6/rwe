@@ -1,0 +1,1 @@
+{ "image": "node:24", "caches": ["/tmp/.cache", "/tmp/.local/share/pnpm", "/workspace/node_modules"] }
