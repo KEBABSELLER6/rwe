@@ -93,7 +93,7 @@ Works today:
 
 Known limits:
 
-- A server restart ends queued and running jobs with status `error` and removes their containers; finished jobs survive.
+- A server restart ends running jobs with status `error` and removes their containers. Queued jobs are queued again, unless their workspace changed or is gone. `rwe run` doesn't wait through the restart yet and reports an error even when its job is requeued.
 - A sync with a running job gets 409: one job per workspace at a time.
 - Only the exec bit of a file is synced, not its full mode (files are 0644 or 0755).
 - Artifacts: only regular files and directories come back, no symlinks. Globs are one level deep (`*`, `?`, `[a-z]`), no `**`. Locally only the latest job's artifacts are kept.
