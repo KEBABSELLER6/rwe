@@ -1,0 +1,1 @@
+{ "image": "rust:1", "caches": ["/usr/local/cargo/registry", "/usr/local/cargo/git", "/workspace/target"] }

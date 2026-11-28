@@ -63,3 +63,4 @@ Tested setups, with timings in [BENCHMARKS.md](../BENCHMARKS.md):
 | Node (npm) | [`node/`](node/) |
 | Node (pnpm) | [`pnpm/`](pnpm/) |
 | Bun | [`bun/`](bun/) |
+| Rust | [`rust/`](rust/) |
