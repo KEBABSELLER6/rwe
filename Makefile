@@ -1,4 +1,4 @@
-.PHONY: run test build vet fmt-check dist
+.PHONY: run test build vet fmt-check vulncheck dist
 
 VERSION ?= dev
 LDFLAGS := -s -w -X main.version=$(VERSION)
@@ -19,6 +19,9 @@ vet:
 
 fmt-check:
 	@test -z "$$(gofmt -l .)" || { gofmt -l .; echo "run gofmt -w ."; exit 1; }
+
+vulncheck:
+	go run golang.org/x/vuln/cmd/govulncheck@v1.10.0 ./...
 
 dist:
 	rm -rf dist && mkdir dist

@@ -21,5 +21,6 @@ jobs:
 
       - run: make fmt-check
       - run: make vet
+      - run: make vulncheck
       - run: make test
       - run: make dist
