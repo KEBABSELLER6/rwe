@@ -21,8 +21,8 @@ See [Caches](#caches) for ready-made ones per stack.
 
 ## Setup
 
-1. Start the server on the box: `make build` and run `bin/server` (needs Docker).
-2. Install the client on your machine: `go install ./cmd/rwe` from this repo, or put `bin/rwe` on your `PATH`.
+1. Start the server on the box (needs Docker): a release's `rwe-server-linux-<arch>`, or `make build` and `bin/server`.
+2. Install the client on your machine from a release, see [Install](../README.md#install), or `go install ./cmd/rwe` from this repo.
 3. Write `~/.config/rwe/config.json` with the server address.
 4. Check it by verifying this repo: `rwe run -- make test` (exit code is the job's).
 5. In the project you want to verify, add `.rwe.json`, `.mcp.json` and the `AGENTS.md` snippet.

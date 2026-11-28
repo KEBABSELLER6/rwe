@@ -38,6 +38,25 @@ bin/rwe run -- make test               # this repo verifying itself
 
 Hooking it up to an agent, config files and precedence: see [`examples/`](examples/).
 
+## Install
+
+Each [release](https://github.com/KEBABSELLER6/rwe/releases) has the client for Linux and macOS
+(`rwe-<os>-<arch>`), the server for Linux (`rwe-server-linux-<arch>`) and a `SHA256SUMS` file.
+Download, check, install:
+
+```sh
+f=rwe-linux-amd64   # or rwe-linux-arm64, rwe-darwin-arm64, rwe-darwin-amd64
+curl -fLO https://github.com/KEBABSELLER6/rwe/releases/latest/download/$f
+curl -fLO https://github.com/KEBABSELLER6/rwe/releases/latest/download/SHA256SUMS
+sha256sum -c --ignore-missing SHA256SUMS   # macOS: shasum -a 256 -c --ignore-missing SHA256SUMS
+install -m 755 $f ~/.local/bin/rwe
+rwe version
+```
+
+With the GitHub CLI, the first three lines are `gh release download -R KEBABSELLER6/rwe -p $f -p SHA256SUMS`
+followed by the same checksum line. For the server, use `rwe-server-linux-<arch>` the same way.
+To build from source instead: `make build`, or `go install ./cmd/rwe` from a clone.
+
 ## What it is not
 
 - **Not an agent sandbox or microVM platform.** rwe doesn't run agents. The agent stays on your
@@ -71,7 +90,7 @@ Known limits:
 - Artifacts are deleted on the box 1 day after the job finishes (`RWE_ARTIFACT_RETENTION`) and dropped when a job's add up to more than 256 MB (`RWE_ARTIFACT_MAX_SIZE`). Only regular files and directories come back, no symlinks. Globs are one level deep (`*`, `?`, `[a-z]`), no `**`. Locally only the latest job's artifacts are kept.
 - A workspace's caches are deleted with it; shared caches 30 days after the last job that used them (`RWE_CACHE_RETENTION`). There is no size cap.
 
-Planned, in rough order: release binaries, deployment notes.
+Planned: deployment notes.
 
 ## Development
 
@@ -79,5 +98,5 @@ Planned, in rough order: release binaries, deployment notes.
 make test    # go test -race ./...
 make vet
 make smoke   # end-to-end checks against a running server (scripts/)
-make dist    # release binaries for linux amd64/arm64 + SHA256SUMS in dist/
+make dist    # release binaries + SHA256SUMS in dist/
 ```
