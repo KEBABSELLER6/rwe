@@ -24,8 +24,12 @@ and returns the exit code and log. Your laptop stays free; the old box in the co
   if the workspace doesn't match, so a job never runs on a mix of old and new files.
 - **Jobs:** one at a time, queued on the server, each in a new container with the workspace mounted.
   Logs stream back live over SSE.
-- **Agents:** `rwe mcp` is a stdio MCP server with two tools: `run` (sync, run, return status and the
-  last 100 log lines) and `logs` (read any part of a job's log).
+- **Agents:** `rwe mcp` is a stdio MCP server with three tools: `run` (sync, run, return status and the
+  last 100 log lines), `logs` (read any part of a job's log) and `stats` (recent runs, see below).
+- **Run history:** every `rwe run` and MCP `run` adds a record to `.rwe/runs.jsonl` in the project:
+  command, image, workspace hash, status, and how long sync, queue, copy, run, artifacts and cleanup
+  took. The newest 50 are kept. `rwe stats [-n 20]` and the MCP `stats` tool summarize them. The
+  history stays on your machine; nothing is sent anywhere.
 
 ## Quick start
 
@@ -80,7 +84,8 @@ Works today:
 - Workspace create and diff sync, deletions, hash-pinned jobs
 - Docker runner with timeout, memory and CPU limits, live log streaming
 - `rwe run` CLI with the job's exit code (124 timeout, 125 infrastructure error)
-- `rwe mcp` with `run` and `logs` tools
+- `rwe mcp` with `run`, `logs` and `stats` tools
+- Run history in `.rwe/runs.jsonl`, shown by `rwe stats` and the MCP `stats` tool
 - User and project config files, env overrides
 - Cache directories kept between jobs (`caches` in `.rwe.json`); see [BENCHMARKS.md](BENCHMARKS.md)
 - Artifacts: files a job leaves behind, downloaded to `.rwe/artifacts/<job>/` (`artifacts` in `.rwe.json`, `rwe run -a`, or the MCP `run` tool); see [examples/](examples/#artifacts)
@@ -93,6 +98,7 @@ Known limits:
 - A sync with a running job gets 409: one job per workspace at a time.
 - Only the exec bit of a file is synced, not its full mode (files are 0644 or 0755).
 - Artifacts are deleted on the box 1 day after the job finishes (`RWE_ARTIFACT_RETENTION`) and dropped when a job's add up to more than 256 MB (`RWE_ARTIFACT_MAX_SIZE`). Only regular files and directories come back, no symlinks. Globs are one level deep (`*`, `?`, `[a-z]`), no `**`. Locally only the latest job's artifacts are kept.
+- The run history is per project and lives in `.rwe/`, so deleting that directory deletes it. Copy, run, artifacts and cleanup times need a server newer than v0.6.0; with an older one they show as `-` and count as "other".
 - A workspace's caches are deleted with it; shared caches 30 days after the last job that used them (`RWE_CACHE_RETENTION`). There is no size cap.
 
 Planned: deployment notes.
