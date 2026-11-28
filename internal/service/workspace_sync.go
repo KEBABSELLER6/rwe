@@ -24,6 +24,9 @@ func (s *WorkspaceService) Sync(ctx context.Context, id uuid.UUID, want manifest
 		return nil, err
 	}
 
+	if err := s.touch(id); err != nil {
+		return nil, err
+	}
 	if err := validateManifest(want, s.limits); err != nil {
 		return nil, err
 	}

@@ -27,6 +27,7 @@ func main() {
 	dataDir := flag.String("data", envOr("RWE_DATA", "local_data"), "directory for workspaces and job logs (env RWE_DATA)")
 	jobMemory := flag.String("job-memory", envOr("RWE_JOB_MEMORY", ""), "memory cap per job, e.g. 2g; also the default when a job sets none (env RWE_JOB_MEMORY)")
 	logRetention := flag.String("log-retention", envOr("RWE_LOG_RETENTION", service.DefaultJobLimits.LogRetention.String()), "delete job logs this long after the job finished, e.g. 72h; 0 keeps them (env RWE_LOG_RETENTION)")
+	workspaceRetention := flag.String("workspace-retention", envOr("RWE_WORKSPACE_RETENTION", service.DefaultWorkspaceLimits.Retention.String()), "delete workspaces this long after their last sync or job, e.g. 168h; 0 keeps them (env RWE_WORKSPACE_RETENTION)")
 	flag.Parse()
 
 	limits := service.DefaultJobLimits
@@ -40,7 +41,13 @@ func main() {
 		os.Exit(2)
 	}
 
-	if err := run(*addr, *dataDir, limits); err != nil {
+	retention, err := time.ParseDuration(*workspaceRetention)
+	if err != nil {
+		slog.Error("invalid workspace retention", "value", *workspaceRetention, "err", err)
+		os.Exit(2)
+	}
+
+	if err := run(*addr, *dataDir, limits, retention); err != nil {
 		slog.Error("application stopped", "err", err)
 		os.Exit(1)
 	}
@@ -53,13 +60,13 @@ func envOr(key, fallback string) string {
 	return fallback
 }
 
-func run(addr, dataDir string, limits service.JobLimits) error {
+func run(addr, dataDir string, limits service.JobLimits, workspaceRetention time.Duration) error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
 	logger := slog.Default()
 
-	ws, err := service.NewWorkspaceService(filepath.Join(dataDir, "workspaces"))
+	ws, err := service.NewWorkspaceService(filepath.Join(dataDir, "workspaces"), workspaceRetention)
 	if err != nil {
 		return fmt.Errorf("init workspace service: %w", err)
 	}
@@ -67,6 +74,8 @@ func run(addr, dataDir string, limits service.JobLimits) error {
 	if err != nil {
 		return fmt.Errorf("init job service: %w", err)
 	}
+
+	go ws.StartPruning(ctx)
 
 	workerDone := make(chan struct{})
 	go func() {
@@ -89,7 +98,7 @@ func run(addr, dataDir string, limits service.JobLimits) error {
 
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- srv.Serve(ln) }()
-	logger.Info("server started", "version", version, "addr", ln.Addr().String(), "data", dataDir, "job_memory", limits.MaxMemory, "log_retention", limits.LogRetention)
+	logger.Info("server started", "version", version, "addr", ln.Addr().String(), "data", dataDir, "job_memory", limits.MaxMemory, "log_retention", limits.LogRetention, "workspace_retention", workspaceRetention)
 
 	var runErr error
 	select {

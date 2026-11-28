@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 	"uuid"
 
 	"kebabseller6/rwe/internal/manifest"
@@ -22,11 +23,13 @@ const (
 type WorkspaceLimits struct {
 	MaxTotalBytes int64
 	MaxFiles      int
+	Retention     time.Duration
 }
 
 var DefaultWorkspaceLimits = WorkspaceLimits{
 	MaxTotalBytes: 200 << 20,
 	MaxFiles:      20_000,
+	Retention:     30 * 24 * time.Hour,
 }
 
 type Workspace struct {
@@ -47,11 +50,13 @@ type WorkspaceService struct {
 	busy       map[uuid.UUID]bool
 }
 
-func NewWorkspaceService(dir string) (*WorkspaceService, error) {
+func NewWorkspaceService(dir string, retention time.Duration) (*WorkspaceService, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, fmt.Errorf("create workspace dir: %w", err)
 	}
-	return &WorkspaceService{dir: dir, limits: DefaultWorkspaceLimits, busy: map[uuid.UUID]bool{}}, nil
+	limits := DefaultWorkspaceLimits
+	limits.Retention = retention
+	return &WorkspaceService{dir: dir, limits: limits, busy: map[uuid.UUID]bool{}}, nil
 }
 
 func (s *WorkspaceService) wsDir(id uuid.UUID) string {

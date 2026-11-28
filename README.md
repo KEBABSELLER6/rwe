@@ -64,12 +64,13 @@ Known limits:
 
 - A server restart ends queued and running jobs with status `error`; finished jobs survive.
 - Job logs are deleted 7 days after the job finishes (`RWE_LOG_RETENTION`); the job status is kept forever.
+- Workspaces are deleted 30 days after their last sync or job (`RWE_WORKSPACE_RETENTION`); the client then creates a new one.
 - A sync with a running job gets 409: one job per workspace at a time.
 - Only the exec bit of a file is synced, not its full mode (files are 0644 or 0755).
 - Nothing comes back but the log: no artifacts yet.
 - Caches are never cleaned up by the server; delete `<data>/caches` to reset them.
 
-Planned, in rough order: release binaries, deployment notes, then artifacts and workspace cleanup.
+Planned, in rough order: release binaries, deployment notes, then artifacts and cache cleanup.
 
 ## Development
 

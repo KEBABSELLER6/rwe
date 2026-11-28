@@ -86,7 +86,7 @@ func TestPutBlob(t *testing.T) {
 
 func TestPutBlob_SetsModeFromSync(t *testing.T) {
 	dir := t.TempDir()
-	s, err := NewWorkspaceService(dir)
+	s, err := NewWorkspaceService(dir, DefaultWorkspaceLimits.Retention)
 	if err != nil {
 		t.Fatal(err)
 	}
