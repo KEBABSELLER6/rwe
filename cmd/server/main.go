@@ -5,9 +5,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"kebabseller6/rwe/internal/handler"
-	"kebabseller6/rwe/internal/runner"
-	"kebabseller6/rwe/internal/service"
 	"log/slog"
 	"net"
 	"net/http"
@@ -16,6 +13,10 @@ import (
 	"path/filepath"
 	"syscall"
 	"time"
+
+	"github.com/KEBABSELLER6/rwe/internal/handler"
+	"github.com/KEBABSELLER6/rwe/internal/runner"
+	"github.com/KEBABSELLER6/rwe/internal/service"
 )
 
 const shutdownTimeout = 30 * time.Second

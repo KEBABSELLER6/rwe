@@ -11,7 +11,7 @@ import (
 	"testing"
 	"uuid"
 
-	"kebabseller6/rwe/internal/manifest"
+	"github.com/KEBABSELLER6/rwe/internal/manifest"
 )
 
 func newSyncedWorkspace(t *testing.T) (*WorkspaceService, string, uuid.UUID) {

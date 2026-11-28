@@ -9,7 +9,7 @@ import (
 	"testing"
 	"uuid"
 
-	"kebabseller6/rwe/internal/manifest"
+	"github.com/KEBABSELLER6/rwe/internal/manifest"
 )
 
 func syncTo(t *testing.T, s *WorkspaceService, id uuid.UUID, contents map[string]string, executable ...string) manifest.Manifest {

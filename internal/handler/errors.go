@@ -2,9 +2,10 @@ package handler
 
 import (
 	"errors"
-	"kebabseller6/rwe/internal/service"
 	"log/slog"
 	"net/http"
+
+	"github.com/KEBABSELLER6/rwe/internal/service"
 )
 
 type ErrorHandler struct {

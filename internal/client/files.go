@@ -12,7 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"kebabseller6/rwe/internal/manifest"
+	"github.com/KEBABSELLER6/rwe/internal/manifest"
 )
 
 const stateDir = ".rwe"

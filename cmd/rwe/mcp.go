@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"kebabseller6/rwe/internal/client"
-	"kebabseller6/rwe/internal/mcp"
+	"github.com/KEBABSELLER6/rwe/internal/client"
+	"github.com/KEBABSELLER6/rwe/internal/mcp"
 )
 
 const (

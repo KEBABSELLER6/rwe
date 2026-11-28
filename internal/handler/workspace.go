@@ -2,9 +2,10 @@ package handler
 
 import (
 	"fmt"
-	"kebabseller6/rwe/internal/manifest"
-	"kebabseller6/rwe/internal/service"
 	"net/http"
+
+	"github.com/KEBABSELLER6/rwe/internal/manifest"
+	"github.com/KEBABSELLER6/rwe/internal/service"
 )
 
 var maxUploadBytes = service.DefaultWorkspaceLimits.MaxTotalBytes
