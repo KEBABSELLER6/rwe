@@ -68,9 +68,9 @@ Known limits:
 - A sync with a running job gets 409: one job per workspace at a time.
 - Only the exec bit of a file is synced, not its full mode (files are 0644 or 0755).
 - Nothing comes back but the log: no artifacts yet.
-- Caches are never cleaned up by the server; delete `<data>/caches` to reset them.
+- A workspace's caches are deleted with it; shared caches 30 days after the last job that used them (`RWE_CACHE_RETENTION`). There is no size cap.
 
-Planned, in rough order: release binaries, deployment notes, then artifacts and cache cleanup.
+Planned, in rough order: release binaries, deployment notes, then artifacts.
 
 ## Development
 

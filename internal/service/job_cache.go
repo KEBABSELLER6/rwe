@@ -8,6 +8,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
 	"uuid"
 )
 
@@ -61,9 +62,13 @@ func inWorkspace(p string) bool {
 }
 
 func prepareCaches(mounts []CacheMount, filesDir string) error {
+	now := time.Now()
 	for _, m := range mounts {
 		if err := os.MkdirAll(m.HostDir, 0o755); err != nil {
 			return fmt.Errorf("create cache dir: %w", err)
+		}
+		if err := os.Chtimes(m.HostDir, now, now); err != nil {
+			return fmt.Errorf("mark cache used: %w", err)
 		}
 		if rel, ok := strings.CutPrefix(m.Path, WorkspaceMount+"/"); ok {
 			if err := os.MkdirAll(filepath.Join(filesDir, filepath.FromSlash(rel)), 0o755); err != nil {

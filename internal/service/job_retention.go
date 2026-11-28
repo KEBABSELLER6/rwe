@@ -11,6 +11,11 @@ import (
 
 const pruneInterval = time.Hour
 
+func (s *JobService) prune(now time.Time) {
+	s.pruneLogs(now)
+	s.pruneCaches(now)
+}
+
 func (s *JobService) pruneLogs(now time.Time) {
 	if s.limits.LogRetention <= 0 {
 		return

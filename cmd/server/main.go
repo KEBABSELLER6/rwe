@@ -28,6 +28,7 @@ func main() {
 	jobMemory := flag.String("job-memory", envOr("RWE_JOB_MEMORY", ""), "memory cap per job, e.g. 2g; also the default when a job sets none (env RWE_JOB_MEMORY)")
 	logRetention := flag.String("log-retention", envOr("RWE_LOG_RETENTION", service.DefaultJobLimits.LogRetention.String()), "delete job logs this long after the job finished, e.g. 72h; 0 keeps them (env RWE_LOG_RETENTION)")
 	workspaceRetention := flag.String("workspace-retention", envOr("RWE_WORKSPACE_RETENTION", service.DefaultWorkspaceLimits.Retention.String()), "delete workspaces this long after their last sync or job, e.g. 168h; 0 keeps them (env RWE_WORKSPACE_RETENTION)")
+	cacheRetention := flag.String("cache-retention", envOr("RWE_CACHE_RETENTION", service.DefaultJobLimits.CacheRetention.String()), "delete shared caches this long after the last job that used them, e.g. 168h; 0 keeps them (env RWE_CACHE_RETENTION)")
 	flag.Parse()
 
 	limits := service.DefaultJobLimits
@@ -38,6 +39,10 @@ func main() {
 	}
 	if limits.LogRetention, err = time.ParseDuration(*logRetention); err != nil {
 		slog.Error("invalid log retention", "value", *logRetention, "err", err)
+		os.Exit(2)
+	}
+	if limits.CacheRetention, err = time.ParseDuration(*cacheRetention); err != nil {
+		slog.Error("invalid cache retention", "value", *cacheRetention, "err", err)
 		os.Exit(2)
 	}
 
@@ -98,7 +103,7 @@ func run(addr, dataDir string, limits service.JobLimits, workspaceRetention time
 
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- srv.Serve(ln) }()
-	logger.Info("server started", "version", version, "addr", ln.Addr().String(), "data", dataDir, "job_memory", limits.MaxMemory, "log_retention", limits.LogRetention, "workspace_retention", workspaceRetention)
+	logger.Info("server started", "version", version, "addr", ln.Addr().String(), "data", dataDir, "job_memory", limits.MaxMemory, "log_retention", limits.LogRetention, "workspace_retention", workspaceRetention, "cache_retention", limits.CacheRetention)
 
 	var runErr error
 	select {
