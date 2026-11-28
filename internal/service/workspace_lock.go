@@ -22,6 +22,9 @@ func (s *WorkspaceService) Acquire(id uuid.UUID, expectedHash string) (filesDir 
 		return "", fmt.Errorf("%w: workspace content does not match expected_hash", ErrConflict)
 	}
 
+	if err := s.touch(id); err != nil {
+		return "", err
+	}
 	s.busy[id] = true
 	return s.filesDir(id), nil
 }

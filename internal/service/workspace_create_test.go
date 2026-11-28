@@ -66,7 +66,7 @@ func sha(s string) string {
 
 func TestCreate_OK(t *testing.T) {
 	dir := t.TempDir()
-	s, err := NewWorkspaceService(dir)
+	s, err := NewWorkspaceService(dir, DefaultWorkspaceLimits.Retention)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,7 +181,7 @@ func TestCreate_Rejects(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dir := t.TempDir()
-			s, err := NewWorkspaceService(dir)
+			s, err := NewWorkspaceService(dir, DefaultWorkspaceLimits.Retention)
 			if err != nil {
 				t.Fatal(err)
 			}

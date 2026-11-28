@@ -41,7 +41,7 @@ func newTestClient(t *testing.T) *Client {
 func newTestClientWith(t *testing.T, runner service.Runner) *Client {
 	t.Helper()
 	data := t.TempDir()
-	ws, err := service.NewWorkspaceService(filepath.Join(data, "workspaces"))
+	ws, err := service.NewWorkspaceService(filepath.Join(data, "workspaces"), service.DefaultWorkspaceLimits.Retention)
 	if err != nil {
 		t.Fatal(err)
 	}

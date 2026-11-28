@@ -17,7 +17,7 @@ import (
 func newSyncedWorkspace(t *testing.T) (*WorkspaceService, string, uuid.UUID) {
 	t.Helper()
 	dir := t.TempDir()
-	s, err := NewWorkspaceService(dir)
+	s, err := NewWorkspaceService(dir, DefaultWorkspaceLimits.Retention)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -218,7 +218,7 @@ func TestSync_TotalSize(t *testing.T) {
 }
 
 func TestSync_UnknownWorkspace(t *testing.T) {
-	s, err := NewWorkspaceService(t.TempDir())
+	s, err := NewWorkspaceService(t.TempDir(), DefaultWorkspaceLimits.Retention)
 	if err != nil {
 		t.Fatal(err)
 	}
