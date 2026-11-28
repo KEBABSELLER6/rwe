@@ -67,6 +67,7 @@ type JobLimits struct {
 	QueueSize      int
 	MaxMemory      int64
 	LogRetention   time.Duration
+	CacheRetention time.Duration
 }
 
 var DefaultJobLimits = JobLimits{
@@ -74,11 +75,13 @@ var DefaultJobLimits = JobLimits{
 	MaxTimeout:     time.Hour,
 	QueueSize:      16,
 	LogRetention:   7 * 24 * time.Hour,
+	CacheRetention: 30 * 24 * time.Hour,
 }
 
 type WorkspaceLocker interface {
 	Acquire(id uuid.UUID, expectedHash string) (filesDir string, err error)
 	Release(id uuid.UUID)
+	Exists(id uuid.UUID) bool
 }
 
 type JobService struct {

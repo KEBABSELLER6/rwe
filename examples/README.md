@@ -41,6 +41,8 @@ it is the default for jobs that set none, and a job asking for more is rejected.
 finished; its status stays available. `0` keeps logs forever.
 `RWE_WORKSPACE_RETENTION` (or `-workspace-retention`, default `720h`) deletes a workspace that long
 after its last sync or job; the next `rwe run` uploads a fresh one. `0` keeps workspaces forever.
+`RWE_CACHE_RETENTION` (or `-cache-retention`, default `720h`) deletes a shared cache that long after
+the last job that used it. A workspace's own caches are deleted together with the workspace.
 Under systemd, load the env file with
 `EnvironmentFile=/etc/rwe/server.env`; `systemctl restart rwe` picks up changes.
 
@@ -54,7 +56,8 @@ Jobs run as the server's user with `HOME=/tmp`, so tool caches usually live unde
 - Docker creates missing parent directories of a cache path as root, and the job can't write
   there. If a tool also writes next to its cache, cache the parent instead (Go: `/go/pkg`, not
   `/go/pkg/mod`).
-- They live in `<data>/caches` on the box; delete that directory to start cold again.
+- They live in `<data>/caches` on the box; delete that directory to start cold again. Unused caches
+  are deleted on their own, see `RWE_CACHE_RETENTION` above.
 
 Tested setups, with timings in [BENCHMARKS.md](../BENCHMARKS.md):
 

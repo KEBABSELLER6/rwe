@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"os"
 	"uuid"
 )
 
@@ -33,6 +34,11 @@ func (s *WorkspaceService) Release(id uuid.UUID) {
 	s.manifestMu.Lock()
 	defer s.manifestMu.Unlock()
 	delete(s.busy, id)
+}
+
+func (s *WorkspaceService) Exists(id uuid.UUID) bool {
+	_, err := os.Stat(s.manifestPath(id))
+	return err == nil
 }
 
 func (s *WorkspaceService) checkNotBusy(id uuid.UUID) error {

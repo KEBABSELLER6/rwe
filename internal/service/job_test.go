@@ -353,6 +353,8 @@ func (m *multiLocker) Acquire(id uuid.UUID, hash string) (string, error) {
 
 func (m *multiLocker) Release(id uuid.UUID) { m.byID[id].Release(id) }
 
+func (m *multiLocker) Exists(id uuid.UUID) bool { return m.byID[id] != nil }
+
 func TestJob_FollowLogs(t *testing.T) {
 	step := make(chan struct{})
 	env := newJobEnv(t, func(_ context.Context, _ RunSpec, logs io.Writer) (int, error) {
