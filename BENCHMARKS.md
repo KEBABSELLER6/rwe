@@ -139,15 +139,18 @@ three (`clap_lex`, `clap_builder`, `clap`).
 | No cache | none | 72.9–75.2s | 84.1–86.2s | 2 |
 | First run with cache (fills it) | `/usr/local/cargo/registry`, `/usr/local/cargo/git` | 80.3s | 90.3s | 1 |
 | Warm | same | 80.7–91.4s | 91.4–98.3s | 2 |
-| First run with `target` cached | same and `/workspace/target` | 101.6s | 110.3s | 1 |
-| Warm, no change | same | 6.7–6.9s | 16.1–16.2s | 2 |
-| Warm, after an edit in `clap_builder` | same | 6.4–6.9s | 15.9–16.7s | 3 |
+| First run with `target` cached | same and `/workspace/target` | 48.4s | 91.9s | 1 |
+| Warm, no change | same | 0.5–2.4s | 4.4–6.8s | 2 |
+| Warm, after an edit in `clap_builder` | same | 3.6–6.0s | 16.0–17.7s | 2 |
 
 - The registry cache saves nothing measurable here: the 66 crates are 68 MB and download in a
   few seconds. It keeps jobs working when crates.io is slow or down.
-- No change and an edit cost the same, because every job rebuilds the three local crates (see
-  [the example](examples/rust/README.md)). Dependencies are not rebuilt.
-- About 9s of every warm job is spent after the command exits, waiting for the ~500 MB of test
+- The last three rows were re-measured on 2026-11-28 with server v0.4.0, which keeps file times
+  when it copies the workspace for a job. Before that, cargo rebuilt the three local crates on
+  every job, and a warm job took 16s even with no change.
+- After an edit, cargo rebuilds only the crates that changed and those depending on them
+  (`clap_builder` and `clap`, not `clap_lex`).
+- About 10s of a job after an edit is spent after the command exits, waiting for the ~500 MB of test
   binaries cargo rewrote to reach the disk. Writing 500 MB with `dd` shows the same: 0.4s inside
   the job, 9.9s for the job. The box's disk takes about 85 MB/s.
 - The very first job took 146s, of which cargo was 91s; the rest was mostly pulling `rust:1`.
