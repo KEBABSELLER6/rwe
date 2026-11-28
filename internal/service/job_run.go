@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
@@ -71,24 +72,52 @@ func (s *JobService) run(ctx context.Context, id uuid.UUID) {
 }
 
 func (s *JobService) runOnCopy(ctx context.Context, id uuid.UUID, spec RunSpec, artifacts []string) (int, []Artifact, error) {
+	t := newPhaseTimer()
+	defer t.log(id)
+
 	filesDir := s.jobFilesDir(id)
-	defer forceRemoveAll(filesDir)
+	defer func() {
+		forceRemoveAll(filesDir)
+		t.done("cleanup")
+	}()
 	if err := copyTree(filesDir, spec.FilesDir); err != nil {
 		return -1, nil, fmt.Errorf("copy workspace for job: %w", err)
 	}
 	if err := prepareCaches(spec.Caches, filesDir); err != nil {
 		return -1, nil, err
 	}
+	t.done("copy")
 	spec.FilesDir = filesDir
-	return s.runWithLog(ctx, id, spec, artifacts)
+	return s.runWithLog(ctx, id, spec, artifacts, t)
 }
 
-func (s *JobService) runWithLog(ctx context.Context, id uuid.UUID, spec RunSpec, artifacts []string) (int, []Artifact, error) {
+func (s *JobService) runWithLog(ctx context.Context, id uuid.UUID, spec RunSpec, artifacts []string, t *phaseTimer) (int, []Artifact, error) {
 	log, err := os.OpenFile(s.logPath(id), os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
 		return -1, nil, err
 	}
 	code, runErr := s.runner.Run(ctx, spec, log)
+	t.done("run")
 	collected := s.collectArtifacts(filepath.Dir(s.logPath(id)), artifacts, log)
+	t.done("artifacts")
 	return code, collected, errors.Join(runErr, log.Close())
+}
+
+type phaseTimer struct {
+	last  time.Time
+	attrs []any
+}
+
+func newPhaseTimer() *phaseTimer {
+	return &phaseTimer{last: time.Now()}
+}
+
+func (t *phaseTimer) done(phase string) {
+	now := time.Now()
+	t.attrs = append(t.attrs, phase, now.Sub(t.last).Round(time.Millisecond))
+	t.last = now
+}
+
+func (t *phaseTimer) log(id uuid.UUID) {
+	slog.Info("job phases", append([]any{"job", id}, t.attrs...)...)
 }
