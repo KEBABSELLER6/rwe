@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -156,5 +157,7 @@ func (d *Docker) ranToExit(name string, code int) bool {
 func (d *Docker) remove(name string) {
 	ctx, cancel := context.WithTimeout(context.Background(), removeTimeout)
 	defer cancel()
-	exec.CommandContext(ctx, d.binary, "rm", "--force", name).Run()
+	start := time.Now()
+	err := exec.CommandContext(ctx, d.binary, "rm", "--force", name).Run()
+	slog.Info("container removed", "container", name, "took", time.Since(start).Round(time.Millisecond), "err", err)
 }
