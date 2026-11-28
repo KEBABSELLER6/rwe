@@ -23,7 +23,8 @@ and returns the exit code and log. Your laptop stays free; the old box in the co
 - **Pinned jobs:** each job carries the manifest hash the client synced. The server rejects the job
   if the workspace doesn't match, so a job never runs on a mix of old and new files.
 - **Jobs:** one at a time, queued on the server, each in a new container with the workspace mounted.
-  Logs stream back live over SSE.
+  Logs stream back live over SSE. If the connection drops, the client reconnects for up to 2 minutes
+  and carries on where it left off.
 - **Agents:** `rwe mcp` is a stdio MCP server with three tools: `run` (sync, run, return status and the
   last 100 log lines), `logs` (read any part of a job's log) and `stats` (recent runs, see below).
 - **Run history:** every `rwe run` and MCP `run` adds a record to `.rwe/runs.jsonl` in the project:
