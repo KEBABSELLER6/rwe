@@ -1,14 +1,20 @@
 package service
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"context"
 	"errors"
+	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
+	"uuid"
 )
 
 func TestJob_CollectsArtifacts(t *testing.T) {
@@ -84,5 +90,89 @@ func TestValidateArtifacts(t *testing.T) {
 	}
 	if want := []string{"dist", "coverage.out", "distx"}; !slices.Equal(got, want) {
 		t.Errorf("clean = %v, want %v", got, want)
+	}
+}
+
+func TestJob_DownloadArtifacts(t *testing.T) {
+	env := newJobEnv(t, func(_ context.Context, spec RunSpec, _ io.Writer) (int, error) {
+		os.MkdirAll(filepath.Join(spec.FilesDir, "dist"), 0o755)
+		os.WriteFile(filepath.Join(spec.FilesDir, "dist", "a.bin"), []byte("aa"), 0o755)
+		os.Symlink("/etc/passwd", filepath.Join(spec.FilesDir, "dist", "link"))
+		return 0, os.WriteFile(filepath.Join(spec.FilesDir, "coverage.out"), []byte("cov"), 0o644)
+	})
+	req := env.request()
+	req.Artifacts = []string{"dist", "coverage.out"}
+	job, err := env.jobs.Submit(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFinished(t, env.jobs, job.ID)
+
+	root, err := env.jobs.OpenArtifacts(job.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	var buf bytes.Buffer
+	if err := WriteTarGz(&buf, root.FS()); err != nil {
+		t.Fatal(err)
+	}
+
+	got := map[string]string{}
+	zr, err := gzip.NewReader(&buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tr := tar.NewReader(zr)
+	for {
+		hdr, err := tr.Next()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(tr)
+		got[hdr.Name] = fmt.Sprintf("%o %s", hdr.Mode&0o777, body)
+	}
+	want := map[string]string{"coverage.out": "644 cov", "dist/": "755 ", "dist/a.bin": "755 aa"}
+	if !maps.Equal(got, want) {
+		t.Errorf("tar entries = %v, want %v (symlinks skipped)", got, want)
+	}
+}
+
+func TestJob_OpenArtifactsErrors(t *testing.T) {
+	release := make(chan struct{})
+	env := newJobEnv(t, func(_ context.Context, spec RunSpec, _ io.Writer) (int, error) {
+		<-release
+		return 0, os.WriteFile(filepath.Join(spec.FilesDir, "out.txt"), []byte("x"), 0o644)
+	})
+	req := env.request()
+	req.Artifacts = []string{"out.txt"}
+	running, err := env.jobs.Submit(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := env.jobs.OpenArtifacts(running.ID); !errors.Is(err, ErrConflict) {
+		t.Errorf("unfinished job: err = %v, want ErrConflict", err)
+	}
+	close(release)
+	waitFinished(t, env.jobs, running.ID)
+
+	plain, err := env.jobs.Submit(env.request())
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFinished(t, env.jobs, plain.ID)
+	if _, err := env.jobs.OpenArtifacts(plain.ID); !errors.Is(err, ErrNotFound) {
+		t.Errorf("job without artifacts: err = %v, want ErrNotFound", err)
+	}
+	if _, err := env.jobs.OpenArtifacts(uuid.NewV7()); !errors.Is(err, ErrNotFound) {
+		t.Errorf("unknown job: err = %v, want ErrNotFound", err)
+	}
+
+	os.RemoveAll(filepath.Join(filepath.Dir(env.jobs.logPath(running.ID)), artifactsDirName))
+	if _, err := env.jobs.OpenArtifacts(running.ID); !errors.Is(err, ErrGone) {
+		t.Errorf("expired artifacts: err = %v, want ErrGone", err)
 	}
 }

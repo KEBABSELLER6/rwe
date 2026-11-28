@@ -1,14 +1,18 @@
 package service
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"errors"
 	"fmt"
 	"io"
 	"io/fs"
 	"os"
 	"path"
+	"path/filepath"
 	"slices"
 	"strings"
+	"uuid"
 )
 
 const (
@@ -104,4 +108,60 @@ func treeSize(fsys fs.FS, name string) (int64, error) {
 		return nil
 	})
 	return size, err
+}
+
+func (s *JobService) OpenArtifacts(id uuid.UUID) (*os.Root, error) {
+	job, err := s.Get(id)
+	switch {
+	case err != nil:
+		return nil, err
+	case !job.Status.Finished():
+		return nil, fmt.Errorf("%w: job %s has not finished", ErrConflict, id)
+	case len(job.Artifacts) == 0:
+		return nil, fmt.Errorf("%w: job %s has no artifacts", ErrNotFound, id)
+	}
+
+	root, err := os.OpenRoot(filepath.Join(s.dir, id.String(), artifactsDirName))
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, fmt.Errorf("%w: artifacts of job %s have expired", ErrGone, id)
+	}
+	return root, err
+}
+
+func WriteTarGz(w io.Writer, fsys fs.FS) error {
+	zw := gzip.NewWriter(w)
+	tw := tar.NewWriter(zw)
+	err := fs.WalkDir(fsys, ".", func(name string, d fs.DirEntry, err error) error {
+		if err != nil || name == "." {
+			return err
+		}
+		if !d.IsDir() && !d.Type().IsRegular() {
+			return nil
+		}
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+		hdr, err := tar.FileInfoHeader(info, "")
+		if err != nil {
+			return err
+		}
+		hdr.Name = name
+		hdr.Uid, hdr.Gid, hdr.Uname, hdr.Gname = 0, 0, "", ""
+		if d.IsDir() {
+			hdr.Name += "/"
+			return tw.WriteHeader(hdr)
+		}
+		if err := tw.WriteHeader(hdr); err != nil {
+			return err
+		}
+		f, err := fsys.Open(name)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		_, err = io.Copy(tw, f)
+		return err
+	})
+	return errors.Join(err, tw.Close(), zw.Close())
 }

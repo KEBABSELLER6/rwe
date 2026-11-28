@@ -18,6 +18,7 @@ func NewRouter(ws WorkspaceService, jobs JobService, logger *slog.Logger) http.H
 	mux.HandleFunc("POST /workspaces/{id}/jobs", jobHandler.HandleSubmit)
 	mux.HandleFunc("GET /jobs/{id}", jobHandler.HandleGet)
 	mux.HandleFunc("GET /jobs/{id}/logs", jobHandler.HandleLogs)
+	mux.HandleFunc("GET /jobs/{id}/artifacts", jobHandler.HandleArtifacts)
 	mux.HandleFunc("DELETE /jobs/{id}", jobHandler.HandleCancel)
 
 	return mux

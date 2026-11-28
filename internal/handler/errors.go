@@ -44,6 +44,8 @@ func statusFor(err error) int {
 		return http.StatusNotFound
 	case errors.Is(err, service.ErrConflict):
 		return http.StatusConflict
+	case errors.Is(err, service.ErrGone):
+		return http.StatusGone
 	default:
 		return http.StatusInternalServerError
 	}
