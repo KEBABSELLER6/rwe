@@ -71,7 +71,7 @@ func (s *JobService) run(ctx context.Context, id uuid.UUID) {
 func (s *JobService) runOnCopy(ctx context.Context, id uuid.UUID, spec RunSpec) (int, error) {
 	filesDir := s.jobFilesDir(id)
 	defer forceRemoveAll(filesDir)
-	if err := os.CopyFS(filesDir, os.DirFS(spec.FilesDir)); err != nil {
+	if err := copyTree(filesDir, spec.FilesDir); err != nil {
 		return -1, fmt.Errorf("copy workspace for job: %w", err)
 	}
 	if err := prepareCaches(spec.Caches, filesDir); err != nil {

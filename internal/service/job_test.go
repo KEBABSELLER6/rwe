@@ -224,6 +224,31 @@ func TestJob_RunsOnCopyOfWorkspace(t *testing.T) {
 	waitFinished(t, env.jobs, next.ID)
 }
 
+func TestJob_CopyKeepsModTimes(t *testing.T) {
+	old := time.Date(2020, 1, 2, 3, 4, 5, 0, time.UTC)
+	env := newJobEnv(t, func(_ context.Context, spec RunSpec, _ io.Writer) (int, error) {
+		info, err := os.Stat(filepath.Join(spec.FilesDir, "keep.txt"))
+		if err != nil {
+			return -1, err
+		}
+		if !info.ModTime().Equal(old) {
+			return -1, fmt.Errorf("job copy keep.txt mtime = %s, want %s", info.ModTime(), old)
+		}
+		return 0, nil
+	})
+	if err := os.Chtimes(filepath.Join(env.wsDir, "files", "keep.txt"), time.Time{}, old); err != nil {
+		t.Fatal(err)
+	}
+
+	job, err := env.jobs.Submit(env.request())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if done := waitFinished(t, env.jobs, job.ID); done.Status != JobPassed {
+		t.Fatalf("status = %s, error: %s", done.Status, done.Error)
+	}
+}
+
 func TestJob_RemovesReadOnlyCopy(t *testing.T) {
 	var jobFiles string
 	env := newJobEnv(t, func(_ context.Context, spec RunSpec, _ io.Writer) (int, error) {

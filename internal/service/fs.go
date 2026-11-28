@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"time"
 )
 
 func cleanName(name string) (string, error) {
@@ -80,6 +81,26 @@ func placeFile(root *os.Root, src, dst string, perm os.FileMode) error {
 	}
 
 	return root.Rename(tmpName, dst)
+}
+
+func copyTree(dst, src string) error {
+	if err := os.CopyFS(dst, os.DirFS(src)); err != nil {
+		return err
+	}
+	return filepath.WalkDir(src, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(src, p)
+		if err != nil {
+			return err
+		}
+		return os.Chtimes(filepath.Join(dst, rel), time.Time{}, info.ModTime())
+	})
 }
 
 func forceRemoveAll(dir string) error {
