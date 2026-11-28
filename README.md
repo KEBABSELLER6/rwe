@@ -100,8 +100,7 @@ Planned: deployment notes.
 ## Development
 
 ```sh
-make test    # go test -race ./...
+make test    # go test -race ./...; e2e/ and Docker runner tests skip without Docker
 make vet
-make smoke   # end-to-end checks against a running server (scripts/)
 make dist    # release binaries + SHA256SUMS in dist/
 ```
