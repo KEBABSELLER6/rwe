@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.0](https://github.com/KEBABSELLER6/rwe/compare/v0.5.0...v0.6.0) (2026-11-28)
+
+
+### Features
+
+* log per-phase job timings ([39c2194](https://github.com/KEBABSELLER6/rwe/commit/39c21945c4526c5b06739cf2e31ef5e7cfa8f23b))
+* log per-phase job timings ([2ad4fe8](https://github.com/KEBABSELLER6/rwe/commit/2ad4fe8a122b263923ba5a380ca6f9bc42b9b0a7))
+
 ## [0.5.0](https://github.com/KEBABSELLER6/rwe/compare/v0.4.0...v0.5.0) (2026-11-28)
 
 
