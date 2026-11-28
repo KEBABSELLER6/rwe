@@ -12,9 +12,10 @@ import (
 const projectConfigFile = ".rwe.json"
 
 type config struct {
-	Server string   `json:"server"`
-	Image  string   `json:"image"`
-	Caches []string `json:"caches"`
+	Server    string   `json:"server"`
+	Image     string   `json:"image"`
+	Caches    []string `json:"caches"`
+	Artifacts []string `json:"artifacts"`
 
 	dir string
 }
@@ -63,6 +64,9 @@ func mergeFile(cfg *config, path string) error {
 	}
 	if file.Caches != nil {
 		cfg.Caches = file.Caches
+	}
+	if file.Artifacts != nil {
+		cfg.Artifacts = file.Artifacts
 	}
 	return nil
 }

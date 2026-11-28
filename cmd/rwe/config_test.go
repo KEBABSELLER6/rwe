@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -84,5 +85,16 @@ func TestConfigCachesFromProjectReplaceUser(t *testing.T) {
 	}
 	if len(cfg.Caches) != 1 || cfg.Caches[0] != "/tmp/.cache/go-build" {
 		t.Fatalf("caches = %v, want the project's list", cfg.Caches)
+	}
+}
+
+func TestConfigArtifactsFromProjectReplaceUser(t *testing.T) {
+	dir := setup(t, `{"artifacts": ["user.out"]}`, `{"artifacts": ["coverage.out", "dist"]}`)
+	cfg, err := loadConfig(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(cfg.Artifacts, []string{"coverage.out", "dist"}) {
+		t.Fatalf("artifacts = %v, want the project's list", cfg.Artifacts)
 	}
 }
