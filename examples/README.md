@@ -59,3 +59,4 @@ Tested setups, with timings in [BENCHMARKS.md](../BENCHMARKS.md):
 | Stack | Example |
 |---|---|
 | Go | [`go/`](go/) |
+| Python (uv) | [`python/`](python/) |

@@ -37,3 +37,26 @@ dependencies, so only the build cache matters.
 
 Module downloads, checked separately with `go get golang.org/x/text@v0.21.0` in an empty module and
 `/go/pkg` cached: 6.7s on the first run, 3.0s on the second with nothing downloaded.
+
+## Python (uv)
+
+[click](https://github.com/pallets/click) at `08b803c`, with
+`uv run pytest -q --ignore=tests/test_utils/test_echo_via_pager.py` (the ignored tests need `less`,
+which the image lacks), image `ghcr.io/astral-sh/uv:python3.13-bookworm-slim` (uv 0.9.30,
+Python 3.13). `uv run` installs the project and its default dependency groups (pytest, mypy,
+pyright, ruff, tox and others) before running about 2,600 tests.
+
+| Case | `caches` | Job time | Runs |
+|---|---|---|---|
+| No cache | none | 19.8–22.1s | 3 |
+| First run with cache (fills it) | `/tmp/.cache/uv` | 19.1s | 1 |
+| Warm | same | 16.4–16.7s | 3 |
+| First run with venv cached | `/tmp/.cache/uv`, `/workspace/.venv` | 16.2s | 1 |
+| Warm | same | 14.6–14.9s | 3 |
+
+- pytest reports 8.5–11s in every run, so the uncached install costs about 8s on top of the 2.8s
+  floor, and both caches together bring it down to about 3.5s.
+- With only the uv cache, uv still builds a fresh virtualenv and copies every package into it.
+  Caching `.venv` skips that.
+- click's dependencies are small. A project with large packages (numpy, torch) should gain more
+  from the uv cache, since downloads would dominate; not measured here.
