@@ -1,4 +1,4 @@
-.PHONY: run test build vet fmt-check smoke dist
+.PHONY: run test build vet fmt-check dist
 
 VERSION ?= dev
 LDFLAGS := -s -w -X main.version=$(VERSION)
@@ -19,9 +19,6 @@ vet:
 
 fmt-check:
 	@test -z "$$(gofmt -l .)" || { gofmt -l .; echo "run gofmt -w ."; exit 1; }
-
-smoke:
-	./scripts/smoke.sh
 
 dist:
 	rm -rf dist && mkdir dist
