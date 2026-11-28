@@ -1,7 +1,10 @@
 package service
 
 import (
+	"context"
+	"io"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -81,5 +84,48 @@ func TestJobRetention_PrunedLogsFollowAsEmpty(t *testing.T) {
 	err = env.jobs.FollowLogs(t.Context(), job.ID, func([]byte) error { lines++; return nil })
 	if err != nil || lines != 0 {
 		t.Errorf("follow pruned log = %d lines, %v; want 0, nil", lines, err)
+	}
+}
+
+func TestJobRetention_PrunesExpiredArtifacts(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		retention time.Duration
+		age       time.Duration
+		wantKept  bool
+	}{
+		{"expired", time.Hour, 2 * time.Hour, false},
+		{"recent", time.Hour, time.Minute, true},
+		{"disabled", 0, 1000 * time.Hour, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			env := newJobEnv(t, func(_ context.Context, spec RunSpec, _ io.Writer) (int, error) {
+				return 0, os.WriteFile(filepath.Join(spec.FilesDir, "out.txt"), []byte("x"), 0o644)
+			})
+			limits := DefaultJobLimits
+			limits.ArtifactRetention = tc.retention
+			jobs, err := NewJobService(t.TempDir(), t.TempDir(), env.ws, env.runner, limits)
+			if err != nil {
+				t.Fatal(err)
+			}
+			req := env.request()
+			req.Artifacts = []string{"out.txt"}
+			job, err := jobs.Submit(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			jobs.run(t.Context(), job.ID)
+			finished, _ := jobs.Get(job.ID)
+
+			jobs.pruneArtifacts(finished.FinishedAt.Add(tc.age))
+
+			_, err = os.Stat(jobs.artifactsDir(job.ID))
+			if kept := err == nil; kept != tc.wantKept {
+				t.Errorf("artifacts kept = %v, want %v (stat err %v)", kept, tc.wantKept, err)
+			}
+			if _, err := os.Stat(jobs.logPath(job.ID)); err != nil {
+				t.Errorf("job log removed with the artifacts: %v", err)
+			}
+		})
 	}
 }

@@ -29,6 +29,8 @@ func main() {
 	logRetention := flag.String("log-retention", envOr("RWE_LOG_RETENTION", service.DefaultJobLimits.LogRetention.String()), "delete job logs this long after the job finished, e.g. 72h; 0 keeps them (env RWE_LOG_RETENTION)")
 	workspaceRetention := flag.String("workspace-retention", envOr("RWE_WORKSPACE_RETENTION", service.DefaultWorkspaceLimits.Retention.String()), "delete workspaces this long after their last sync or job, e.g. 168h; 0 keeps them (env RWE_WORKSPACE_RETENTION)")
 	cacheRetention := flag.String("cache-retention", envOr("RWE_CACHE_RETENTION", service.DefaultJobLimits.CacheRetention.String()), "delete shared caches this long after the last job that used them, e.g. 168h; 0 keeps them (env RWE_CACHE_RETENTION)")
+	artifactRetention := flag.String("artifact-retention", envOr("RWE_ARTIFACT_RETENTION", service.DefaultJobLimits.ArtifactRetention.String()), "delete job artifacts this long after the job finished, e.g. 72h; 0 keeps them (env RWE_ARTIFACT_RETENTION)")
+	artifactMaxSize := flag.String("artifact-max-size", envOr("RWE_ARTIFACT_MAX_SIZE", "256m"), "drop a job's artifacts when together they are larger, e.g. 1g; 0 means no limit (env RWE_ARTIFACT_MAX_SIZE)")
 	flag.Parse()
 
 	limits := service.DefaultJobLimits
@@ -43,6 +45,15 @@ func main() {
 	}
 	if limits.CacheRetention, err = time.ParseDuration(*cacheRetention); err != nil {
 		slog.Error("invalid cache retention", "value", *cacheRetention, "err", err)
+		os.Exit(2)
+	}
+
+	if limits.ArtifactRetention, err = time.ParseDuration(*artifactRetention); err != nil {
+		slog.Error("invalid artifact retention", "value", *artifactRetention, "err", err)
+		os.Exit(2)
+	}
+	if limits.ArtifactMaxSize, err = parseBytes(*artifactMaxSize); err != nil {
+		slog.Error("invalid artifact max size", "value", *artifactMaxSize, "err", err)
 		os.Exit(2)
 	}
 
@@ -114,7 +125,7 @@ func run(addr, dataDir string, limits service.JobLimits, workspaceRetention time
 
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- srv.Serve(ln) }()
-	logger.Info("server started", "version", version, "addr", ln.Addr().String(), "data", dataDir, "job_memory", limits.MaxMemory, "log_retention", limits.LogRetention, "workspace_retention", workspaceRetention, "cache_retention", limits.CacheRetention)
+	logger.Info("server started", "version", version, "addr", ln.Addr().String(), "data", dataDir, "job_memory", limits.MaxMemory, "log_retention", limits.LogRetention, "workspace_retention", workspaceRetention, "cache_retention", limits.CacheRetention, "artifact_retention", limits.ArtifactRetention, "artifact_max_size", limits.ArtifactMaxSize)
 
 	var runErr error
 	select {
