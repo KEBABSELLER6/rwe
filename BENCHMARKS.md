@@ -107,3 +107,23 @@ and both files in `.prettierignore`. Command
   metadata and 74 MB of corepack's copy of pnpm.
 - Measured in a fresh workspace: a `node_modules` cache left over from npm keeps npm's packages
   around (pnpm moves them aside as `.ignored_*`), so delete `.rwe/workspace` after switching.
+
+## Bun
+
+[Elysia](https://github.com/elysiajs/elysia) at `e212071`, a project developed on bun, with
+`bun install --frozen-lockfile && bun run test:functionality && bun run test:types`, image
+`oven/bun:1` (bun 1.4.5). That is `bun test` (1711 tests, 6.7s) and `tsc` (12.6s); Elysia's
+`test:node` step needs npm and Node, which the image doesn't have. yargs isn't used here because
+its test suite is written against Node's runtime.
+
+| Case | `caches` | Install time | Job time | Runs |
+|---|---|---|---|---|
+| No cache | none | 0.9–1.1s | 25.5–26.2s | 3 |
+| First run with cache (fills it) | `/tmp/.bun` | 0.8s | 25.0s | 1 |
+| Warm | same | 0.18–0.20s | 24.2–24.5s | 3 |
+| First run with `node_modules` cached | same and `/workspace/node_modules` | 0.2s | 24.3s | 1 |
+| Warm | same | 0.01–0.3s | 23.3–23.9s | 3 |
+
+- An empty job (`true`) takes 3.5s for this project, more than the 2.8s floor measured for Go.
+- The install is a small part of the job with or without a cache: Elysia has 219 packages
+  (135 MB in `node_modules`, the same in the cache).

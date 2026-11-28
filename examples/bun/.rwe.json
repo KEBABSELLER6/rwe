@@ -1,0 +1,1 @@
+{ "image": "oven/bun:1", "caches": ["/tmp/.bun", "/workspace/node_modules"] }
