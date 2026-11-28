@@ -68,7 +68,7 @@ Known limits:
 - Workspaces are deleted 30 days after their last sync or job (`RWE_WORKSPACE_RETENTION`); the client then creates a new one.
 - A sync with a running job gets 409: one job per workspace at a time.
 - Only the exec bit of a file is synced, not its full mode (files are 0644 or 0755).
-- Artifacts are deleted on the box 1 day after the job finishes (`RWE_ARTIFACT_RETENTION`) and dropped when a job's add up to more than 256 MB (`RWE_ARTIFACT_MAX_SIZE`). Only regular files and directories come back, no symlinks, and no globs yet. Locally only the latest job's artifacts are kept.
+- Artifacts are deleted on the box 1 day after the job finishes (`RWE_ARTIFACT_RETENTION`) and dropped when a job's add up to more than 256 MB (`RWE_ARTIFACT_MAX_SIZE`). Only regular files and directories come back, no symlinks. Globs are one level deep (`*`, `?`, `[a-z]`), no `**`. Locally only the latest job's artifacts are kept.
 - A workspace's caches are deleted with it; shared caches 30 days after the last job that used them (`RWE_CACHE_RETENTION`). There is no size cap.
 
 Planned, in rough order: release binaries, deployment notes.

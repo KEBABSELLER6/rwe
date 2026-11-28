@@ -58,7 +58,7 @@ func TestJob_CollectsArtifacts(t *testing.T) {
 	}
 
 	log, _ := os.ReadFile(env.jobs.logPath(job.ID))
-	for _, line := range []string{"artifact missing.txt not found", "artifact escape/secret:"} {
+	for _, line := range []string{"artifact missing.txt not found", "artifact escape/secret not found"} {
 		if !strings.Contains(string(log), line) {
 			t.Errorf("log %q does not mention %q", log, line)
 		}
@@ -76,6 +76,7 @@ func TestValidateArtifacts(t *testing.T) {
 		{"duplicate", []string{"dist", "dist/"}},
 		{"nested", []string{"dist/a", "dist"}},
 		{"too many", slices.Repeat([]string{"x"}, maxArtifacts+1)},
+		{"bad pattern", []string{"reports/[a-"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -206,5 +207,31 @@ func TestJob_DropsArtifactsOverSizeLimit(t *testing.T) {
 	}
 	if log, _ := os.ReadFile(jobs.logPath(job.ID)); !strings.Contains(string(log), "over the 10 byte limit") {
 		t.Errorf("log %q does not mention the limit", log)
+	}
+}
+
+func TestJob_CollectsArtifactGlobs(t *testing.T) {
+	env := newJobEnv(t, func(_ context.Context, spec RunSpec, _ io.Writer) (int, error) {
+		for _, name := range []string{"reports/a/junit.xml", "reports/b/junit.xml", "reports/b/other.txt", "out/x.log", "out/y.log", "out/z.txt"} {
+			p := filepath.Join(spec.FilesDir, name)
+			os.MkdirAll(filepath.Dir(p), 0o755)
+			os.WriteFile(p, []byte("1"), 0o644)
+		}
+		return 0, nil
+	})
+	req := env.request()
+	req.Artifacts = []string{"reports/*/junit.xml", "o*", "out/*.log", "*.none"}
+	job, err := env.jobs.Submit(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := waitFinished(t, env.jobs, job.ID)
+
+	want := []Artifact{{Path: "out", Size: 3}, {Path: "reports/a/junit.xml", Size: 1}, {Path: "reports/b/junit.xml", Size: 1}}
+	if !slices.Equal(done.Artifacts, want) {
+		t.Errorf("artifacts = %v, want %v (globs expanded, paths inside out/ folded into it)", done.Artifacts, want)
+	}
+	if log, _ := os.ReadFile(env.jobs.logPath(job.ID)); !strings.Contains(string(log), "artifact *.none not found") {
+		t.Errorf("log %q does not mention the empty glob", log)
 	}
 }
