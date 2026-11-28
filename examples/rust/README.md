@@ -17,10 +17,10 @@ Then run tests with `rwe run -- cargo test`.
 - Don't cache all of `/usr/local/cargo`: it also holds `cargo` and `rustc` themselves.
 - `target` is large (1.4 GB for clap) and nothing cleans it up yet. Delete
   `<data>/caches/workspaces` on the box to reclaim it.
-- Every job rebuilds the project's own crates, even with no change: rwe copies the workspace for
-  each job without keeping file times, and cargo decides by file time. Dependencies stay built.
+- cargo decides what to rebuild by file time. rwe keeps file times when it copies the workspace for a
+  job (server v0.4.0 and later), so only the crates you changed are rebuilt.
 
 ## Results
 
-[clap](https://github.com/clap-rs/clap)'s `cargo test` goes from about 85s to 16s once `target` is
-warm. Details in [BENCHMARKS.md](../../BENCHMARKS.md#rust).
+[clap](https://github.com/clap-rs/clap)'s `cargo test` goes from about 85s to 4–7s once `target` is
+warm, and 16–18s after an edit in `clap_builder`. Details in [BENCHMARKS.md](../../BENCHMARKS.md#rust).
