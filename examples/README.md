@@ -60,3 +60,4 @@ Tested setups, with timings in [BENCHMARKS.md](../BENCHMARKS.md):
 |---|---|
 | Go | [`go/`](go/) |
 | Python (uv) | [`python/`](python/) |
+| Node (npm) | [`node/`](node/) |
