@@ -1,0 +1,1 @@
+{ "image": "ghcr.io/astral-sh/uv:python3.13-bookworm-slim", "caches": ["/tmp/.cache/uv", "/workspace/.venv"] }
