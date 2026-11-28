@@ -19,6 +19,7 @@ const usage = `usage:
   rwe run [-i IMAGE] [-t SECONDS] [-a PATH]... -- CMD...
                                               sync the current dir and run CMD remotely;
                                               -a brings PATH back to .rwe/artifacts/<job>/
+  rwe stats [-n RUNS]                         show the last RUNS runs (default 20) from .rwe/runs.jsonl
   rwe version`
 
 func main() {
@@ -43,7 +44,7 @@ func dispatch(ctx context.Context, cmd string, args []string) (int, error) {
 	case "version":
 		fmt.Println(version)
 		return 0, nil
-	case "mcp", "run":
+	case "mcp", "run", "stats":
 	default:
 		fmt.Fprintln(os.Stderr, usage)
 		return 2, nil
@@ -58,8 +59,11 @@ func dispatch(ctx context.Context, cmd string, args []string) (int, error) {
 		return 0, err
 	}
 
-	if cmd == "mcp" {
+	switch cmd {
+	case "mcp":
 		return 0, serveMCP(ctx, cfg)
+	case "stats":
+		return statsCmd(cfg, args)
 	}
 	return runCmd(ctx, cfg, args)
 }
