@@ -60,6 +60,7 @@ type Job struct {
 	PhasesMS    map[string]int64 `json:"phases_ms,omitempty"`
 	Artifacts   []Artifact       `json:"artifacts,omitempty"`
 
+	expectedHash  string
 	spec          RunSpec
 	artifactPaths []string
 	cancel        context.CancelCauseFunc
@@ -239,18 +240,8 @@ func (s *JobService) newJob(req JobRequest, filesDir string) (Job, error) {
 		Caches:      slices.Clone(req.Caches),
 		Status:      JobQueued,
 		CreatedAt:   time.Now(),
-		spec: RunSpec{
-			Name:     "rwe-" + id.String(),
-			Image:    req.Image,
-			Command:  slices.Clone(req.Command),
-			FilesDir: filesDir,
-			Timeout:  req.Timeout,
-			Memory:   req.Memory,
-			CPUs:     req.CPUs,
-			Caches:   s.cacheMounts(req.WorkspaceID, req.Caches),
-		},
-		artifactPaths: req.Artifacts,
 	}
+	s.prepare(job, req, filesDir)
 
 	if err := s.save(job); err != nil {
 		forceRemoveAll(filepath.Dir(s.logPath(id)))
@@ -261,6 +252,21 @@ func (s *JobService) newJob(req JobRequest, filesDir string) (Job, error) {
 	s.jobs[id] = job
 	s.mu.Unlock()
 	return *job, nil
+}
+
+func (s *JobService) prepare(job *Job, req JobRequest, filesDir string) {
+	job.expectedHash = req.ExpectedHash
+	job.artifactPaths = req.Artifacts
+	job.spec = RunSpec{
+		Name:     "rwe-" + job.ID.String(),
+		Image:    req.Image,
+		Command:  slices.Clone(req.Command),
+		FilesDir: filesDir,
+		Timeout:  req.Timeout,
+		Memory:   req.Memory,
+		CPUs:     req.CPUs,
+		Caches:   s.cacheMounts(req.WorkspaceID, req.Caches),
+	}
 }
 
 func (s *JobService) forget(id uuid.UUID) {

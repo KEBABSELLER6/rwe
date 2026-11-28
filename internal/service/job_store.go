@@ -20,8 +20,31 @@ func (s *JobService) statePath(id uuid.UUID) string {
 	return filepath.Join(s.dir, id.String(), jobStateFile)
 }
 
+type jobState struct {
+	Job
+	Requeue *requeueSpec `json:"requeue,omitempty"`
+}
+
+type requeueSpec struct {
+	ExpectedHash string   `json:"expected_hash"`
+	TimeoutMS    int64    `json:"timeout_ms"`
+	Memory       int64    `json:"memory,omitzero"`
+	CPUs         float64  `json:"cpus,omitzero"`
+	Artifacts    []string `json:"artifacts,omitempty"`
+}
+
 func (s *JobService) save(job *Job) error {
-	return writeFileJSON(s.statePath(job.ID), job)
+	state := jobState{Job: *job}
+	if job.Status == JobQueued {
+		state.Requeue = &requeueSpec{
+			ExpectedHash: job.expectedHash,
+			TimeoutMS:    job.spec.Timeout.Milliseconds(),
+			Memory:       job.spec.Memory,
+			CPUs:         job.spec.CPUs,
+			Artifacts:    job.artifactPaths,
+		}
+	}
+	return writeFileJSON(s.statePath(job.ID), state)
 }
 
 func (s *JobService) saveOrWarn(job *Job) {
@@ -40,7 +63,7 @@ func (s *JobService) load() error {
 		if err != nil || !entry.IsDir() {
 			continue
 		}
-		job, err := s.loadJob(id)
+		state, err := s.loadState(id)
 		if errors.Is(err, fs.ErrNotExist) {
 			continue
 		}
@@ -48,29 +71,64 @@ func (s *JobService) load() error {
 			slog.Warn("skip unreadable job state", "job", id, "err", err)
 			continue
 		}
+		job := &state.Job
 		s.jobs[id] = job
+		if job.Status.Finished() {
+			continue
+		}
+		if err := s.requeue(job, state.Requeue); err != nil {
+			job.Status = JobError
+			job.Error = err.Error()
+			job.FinishedAt = time.Now()
+			forceRemoveAll(s.jobFilesDir(id))
+			s.saveOrWarn(job)
+			continue
+		}
+		slog.Info("requeued job after restart", "job", id)
 	}
 	return nil
 }
 
-func (s *JobService) loadJob(id uuid.UUID) (*Job, error) {
+func (s *JobService) loadState(id uuid.UUID) (*jobState, error) {
 	raw, err := os.ReadFile(s.statePath(id))
 	if err != nil {
 		return nil, err
 	}
-	var job Job
-	if err := json.Unmarshal(raw, &job); err != nil {
+	var state jobState
+	if err := json.Unmarshal(raw, &state); err != nil {
 		return nil, err
 	}
-	if job.ID != id {
-		return nil, fmt.Errorf("state file has id %s", job.ID)
+	if state.ID != id {
+		return nil, fmt.Errorf("state file has id %s", state.ID)
 	}
-	if !job.Status.Finished() {
-		job.Status = JobError
-		job.Error = errServerRestarted.Error()
-		job.FinishedAt = time.Now()
-		forceRemoveAll(s.jobFilesDir(id))
-		s.saveOrWarn(&job)
+	return &state, nil
+}
+
+func (s *JobService) requeue(job *Job, spec *requeueSpec) error {
+	if job.Status != JobQueued || spec == nil {
+		return errServerRestarted
 	}
-	return &job, nil
+	req := JobRequest{
+		WorkspaceID:  job.WorkspaceID,
+		ExpectedHash: spec.ExpectedHash,
+		Image:        job.Image,
+		Command:      job.Command,
+		Timeout:      time.Duration(spec.TimeoutMS) * time.Millisecond,
+		Memory:       spec.Memory,
+		CPUs:         spec.CPUs,
+		Caches:       job.Caches,
+		Artifacts:    spec.Artifacts,
+	}
+	filesDir, err := s.workspaces.Acquire(req.WorkspaceID, req.ExpectedHash)
+	if err != nil {
+		return fmt.Errorf("%w; requeue: %w", errServerRestarted, err)
+	}
+	s.prepare(job, req, filesDir)
+	select {
+	case s.queue <- job.ID:
+		return nil
+	default:
+		s.workspaces.Release(req.WorkspaceID)
+		return fmt.Errorf("%w; requeue: job queue is full", errServerRestarted)
+	}
 }
