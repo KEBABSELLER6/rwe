@@ -76,7 +76,7 @@ func TestRunSyncsAndStreamsLogs(t *testing.T) {
 	writeFiles(t, dir, map[string]string{"a.txt": "a", "sub/b.txt": "b"})
 
 	var lines []string
-	job, err := c.Run(t.Context(), dir, JobSpec{Image: "img", Command: []string{"ls"}}, func(l string) { lines = append(lines, l) })
+	job, _, err := c.Run(t.Context(), dir, JobSpec{Image: "img", Command: []string{"ls"}}, func(l string) { lines = append(lines, l) })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,7 +107,7 @@ func TestRunCancelStopsServerJob(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	errc := make(chan error, 1)
 	go func() {
-		_, err := c.Run(ctx, dir, JobSpec{Image: "img", Command: []string{"sleep"}}, func(string) {})
+		_, _, err := c.Run(ctx, dir, JobSpec{Image: "img", Command: []string{"sleep"}}, func(string) {})
 		errc <- err
 	}()
 	id := strings.TrimPrefix(<-runner.started, "rwe-")

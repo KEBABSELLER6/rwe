@@ -19,6 +19,7 @@ type Synced struct {
 	Hash        string
 	Files       int
 	Uploaded    int
+	Created     bool
 }
 
 func (c *Client) Sync(ctx context.Context, dir string) (Synced, error) {
@@ -35,7 +36,8 @@ func (c *Client) Sync(ctx context.Context, dir string) (Synced, error) {
 	if err != nil {
 		return Synced{}, err
 	}
-	if id == "" {
+	created := id == ""
+	if created {
 		if id, err = c.createWorkspace(ctx, dir, files); err != nil {
 			return Synced{}, err
 		}
@@ -43,6 +45,7 @@ func (c *Client) Sync(ctx context.Context, dir string) (Synced, error) {
 
 	missing, err := c.syncManifest(ctx, id, tree)
 	if isStatus(err, http.StatusNotFound) {
+		created = true
 		if id, err = c.createWorkspace(ctx, dir, files); err != nil {
 			return Synced{}, err
 		}
@@ -57,7 +60,7 @@ func (c *Client) Sync(ctx context.Context, dir string) (Synced, error) {
 		return Synced{}, err
 	}
 
-	return Synced{WorkspaceID: id, Hash: tree.Files.Hash(), Files: len(tree.Files), Uploaded: uploaded}, nil
+	return Synced{WorkspaceID: id, Hash: tree.Files.Hash(), Files: len(tree.Files), Uploaded: uploaded, Created: created}, nil
 }
 
 func (c *Client) createWorkspace(ctx context.Context, dir string, files []string) (string, error) {

@@ -36,22 +36,28 @@ type Job struct {
 	Status     JobStatus        `json:"status"`
 	ExitCode   *int             `json:"exit_code"`
 	Error      string           `json:"error"`
+	CreatedAt  time.Time        `json:"created_at"`
+	StartedAt  time.Time        `json:"started_at"`
 	DurationMS int64            `json:"duration_ms"`
 	PhasesMS   map[string]int64 `json:"phases_ms"`
 	Artifacts  []Artifact       `json:"artifacts"`
 }
 
-func (c *Client) Run(ctx context.Context, dir string, spec JobSpec, emit func(line string)) (Job, error) {
+func (c *Client) Run(ctx context.Context, dir string, spec JobSpec, emit func(line string)) (Job, RunRecord, error) {
+	rec := RunRecord{At: time.Now(), Image: spec.Image, Command: spec.Command}
 	synced, err := c.Sync(ctx, dir)
+	rec.SyncMS = time.Since(rec.At).Milliseconds()
 	if err != nil {
-		return Job{}, fmt.Errorf("sync: %w", err)
+		return Job{}, rec, fmt.Errorf("sync: %w", err)
 	}
+	rec.Hash, rec.Files, rec.Uploaded, rec.Created = synced.Hash, synced.Files, synced.Uploaded, synced.Created
 	submitCtx, cancel := detached(ctx)
 	job, err := c.Submit(submitCtx, synced, spec)
 	cancel()
 	if err != nil {
-		return Job{}, err
+		return Job{}, rec, err
 	}
+	rec.JobID = job.ID
 
 	final, err := c.FollowLogs(ctx, job.ID, emit)
 	if ctx.Err() != nil {
@@ -59,7 +65,8 @@ func (c *Client) Run(ctx context.Context, dir string, spec JobSpec, emit func(li
 		defer cancel()
 		c.Cancel(cancelCtx, job.ID)
 	}
-	return final, err
+	rec.setJob(final)
+	return final, rec, err
 }
 
 func detached(ctx context.Context) (context.Context, context.CancelFunc) {

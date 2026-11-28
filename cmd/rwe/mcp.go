@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"kebabseller6/rwe/internal/client"
 	"kebabseller6/rwe/internal/mcp"
@@ -62,11 +63,15 @@ func serveMCP(ctx context.Context, cfg config) error {
 
 			var tail lineTail
 			spec := client.JobSpec{Image: args.Image, Command: []string{"sh", "-c", args.Command}, TimeoutSeconds: args.TimeoutSeconds, Caches: cfg.Caches, Artifacts: args.Artifacts}
-			job, err := c.Run(ctx, cfg.dir, spec, tail.add)
+			job, rec, err := c.Run(ctx, cfg.dir, spec, tail.add)
 			if err != nil {
+				saveRun(cfg.dir, rec, err)
 				return "", err
 			}
+			start := time.Now()
 			dst, err := c.FetchArtifacts(ctx, cfg.dir, job)
+			rec.ArtifactsMS = time.Since(start).Milliseconds()
+			saveRun(cfg.dir, rec, nil)
 			if err != nil {
 				dst = "not downloaded: " + err.Error()
 			}
