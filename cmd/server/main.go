@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/KEBABSELLER6/rwe/internal/buildinfo"
 	"github.com/KEBABSELLER6/rwe/internal/handler"
 	"github.com/KEBABSELLER6/rwe/internal/runner"
 	"github.com/KEBABSELLER6/rwe/internal/service"
@@ -22,6 +23,10 @@ import (
 const shutdownTimeout = 30 * time.Second
 
 var version = "dev"
+
+func init() {
+	version = buildinfo.Version(version)
+}
 
 func main() {
 	addr := flag.String("addr", envOr("RWE_ADDR", ":8999"), "listen address (env RWE_ADDR)")
