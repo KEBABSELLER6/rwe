@@ -57,6 +57,11 @@ With the GitHub CLI, the first three lines are `gh release download -R KEBABSELL
 followed by the same checksum line. For the server, use `rwe-server-linux-<arch>` the same way.
 To build from source instead: `make build`, or `go install ./cmd/rwe` from a clone.
 
+`~/.local/bin` must be on your `PATH`; macOS doesn't add it by default. If `rwe version` still shows
+the old version, either an older `rwe` comes first on `PATH` (`which -a rwe` lists them all) or your
+shell remembers where it found `rwe` before (`hash -r`, or open a new shell). After upgrading,
+restart your agent's MCP server so it picks up the new binary.
+
 ## What it is not
 
 - **Not an agent sandbox or microVM platform.** rwe doesn't run agents. The agent stays on your
