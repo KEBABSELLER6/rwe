@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 	"uuid"
 )
@@ -38,11 +39,11 @@ func (s *JobService) run(ctx context.Context, id uuid.UUID) {
 	job.Status = JobRunning
 	job.StartedAt = time.Now()
 	job.cancel = cancel
-	spec := job.spec
+	spec, artifacts := job.spec, job.artifactPaths
 	s.saveOrWarn(job)
 	s.mu.Unlock()
 
-	code, err := s.runOnCopy(ctx, id, spec)
+	code, collected, err := s.runOnCopy(ctx, id, spec, artifacts)
 	s.workspaces.Release(job.WorkspaceID)
 
 	s.mu.Lock()
@@ -50,6 +51,7 @@ func (s *JobService) run(ctx context.Context, id uuid.UUID) {
 	defer s.saveOrWarn(job)
 	job.FinishedAt = time.Now()
 	job.DurationMS = job.FinishedAt.Sub(job.StartedAt).Milliseconds()
+	job.Artifacts = collected
 	switch {
 	case err != nil && errors.Is(context.Cause(ctx), errCancelled):
 		job.Status = JobCancelled
@@ -68,24 +70,25 @@ func (s *JobService) run(ctx context.Context, id uuid.UUID) {
 	}
 }
 
-func (s *JobService) runOnCopy(ctx context.Context, id uuid.UUID, spec RunSpec) (int, error) {
+func (s *JobService) runOnCopy(ctx context.Context, id uuid.UUID, spec RunSpec, artifacts []string) (int, []Artifact, error) {
 	filesDir := s.jobFilesDir(id)
 	defer forceRemoveAll(filesDir)
 	if err := copyTree(filesDir, spec.FilesDir); err != nil {
-		return -1, fmt.Errorf("copy workspace for job: %w", err)
+		return -1, nil, fmt.Errorf("copy workspace for job: %w", err)
 	}
 	if err := prepareCaches(spec.Caches, filesDir); err != nil {
-		return -1, err
+		return -1, nil, err
 	}
 	spec.FilesDir = filesDir
-	return s.runWithLog(ctx, id, spec)
+	return s.runWithLog(ctx, id, spec, artifacts)
 }
 
-func (s *JobService) runWithLog(ctx context.Context, id uuid.UUID, spec RunSpec) (int, error) {
+func (s *JobService) runWithLog(ctx context.Context, id uuid.UUID, spec RunSpec, artifacts []string) (int, []Artifact, error) {
 	log, err := os.OpenFile(s.logPath(id), os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
-		return -1, err
+		return -1, nil, err
 	}
 	code, runErr := s.runner.Run(ctx, spec, log)
-	return code, errors.Join(runErr, log.Close())
+	collected := s.collectArtifacts(filepath.Dir(s.logPath(id)), artifacts, log)
+	return code, collected, errors.Join(runErr, log.Close())
 }

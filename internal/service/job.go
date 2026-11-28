@@ -41,24 +41,27 @@ type JobRequest struct {
 	Memory       int64
 	CPUs         float64
 	Caches       []string
+	Artifacts    []string
 }
 
 type Job struct {
-	ID          uuid.UUID `json:"id"`
-	WorkspaceID uuid.UUID `json:"workspace_id"`
-	Image       string    `json:"image"`
-	Command     []string  `json:"command"`
-	Caches      []string  `json:"caches,omitempty"`
-	Status      JobStatus `json:"status"`
-	ExitCode    *int      `json:"exit_code,omitempty"`
-	Error       string    `json:"error,omitempty"`
-	CreatedAt   time.Time `json:"created_at"`
-	StartedAt   time.Time `json:"started_at,omitzero"`
-	FinishedAt  time.Time `json:"finished_at,omitzero"`
-	DurationMS  int64     `json:"duration_ms,omitzero"`
+	ID          uuid.UUID  `json:"id"`
+	WorkspaceID uuid.UUID  `json:"workspace_id"`
+	Image       string     `json:"image"`
+	Command     []string   `json:"command"`
+	Caches      []string   `json:"caches,omitempty"`
+	Status      JobStatus  `json:"status"`
+	ExitCode    *int       `json:"exit_code,omitempty"`
+	Error       string     `json:"error,omitempty"`
+	CreatedAt   time.Time  `json:"created_at"`
+	StartedAt   time.Time  `json:"started_at,omitzero"`
+	FinishedAt  time.Time  `json:"finished_at,omitzero"`
+	DurationMS  int64      `json:"duration_ms,omitzero"`
+	Artifacts   []Artifact `json:"artifacts,omitempty"`
 
-	spec   RunSpec
-	cancel context.CancelCauseFunc
+	spec          RunSpec
+	artifactPaths []string
+	cancel        context.CancelCauseFunc
 }
 
 type JobLimits struct {
@@ -200,6 +203,11 @@ func (s *JobService) validate(req *JobRequest) error {
 	if err := validateCaches(req.Caches); err != nil {
 		return err
 	}
+	artifacts, err := validateArtifacts(req.Artifacts)
+	if err != nil {
+		return err
+	}
+	req.Artifacts = artifacts
 	if req.Timeout == 0 {
 		req.Timeout = s.limits.DefaultTimeout
 	}
@@ -236,6 +244,7 @@ func (s *JobService) newJob(req JobRequest, filesDir string) (Job, error) {
 			CPUs:     req.CPUs,
 			Caches:   s.cacheMounts(req.WorkspaceID, req.Caches),
 		},
+		artifactPaths: req.Artifacts,
 	}
 
 	if err := s.save(job); err != nil {
