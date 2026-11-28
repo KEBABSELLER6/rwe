@@ -89,17 +89,15 @@ Works today:
 - User and project config files, env overrides
 - Cache directories kept between jobs (`caches` in `.rwe.json`); see [BENCHMARKS.md](BENCHMARKS.md)
 - Artifacts: files a job leaves behind, downloaded to `.rwe/artifacts/<job>/` (`artifacts` in `.rwe.json`, `rwe run -a`, or the MCP `run` tool); see [examples/](examples/#artifacts)
+- Cleanup on the box: old job logs, workspaces, shared caches and artifacts are deleted after a configurable time, and oversized artifacts are dropped; `0` turns each off. See [examples/](examples/#config-precedence)
 
 Known limits:
 
 - A server restart ends queued and running jobs with status `error` and removes their containers; finished jobs survive.
-- Job logs are deleted 7 days after the job finishes (`RWE_LOG_RETENTION`); the job status is kept forever.
-- Workspaces are deleted 30 days after their last sync or job (`RWE_WORKSPACE_RETENTION`); the client then creates a new one.
 - A sync with a running job gets 409: one job per workspace at a time.
 - Only the exec bit of a file is synced, not its full mode (files are 0644 or 0755).
-- Artifacts are deleted on the box 1 day after the job finishes (`RWE_ARTIFACT_RETENTION`) and dropped when a job's add up to more than 256 MB (`RWE_ARTIFACT_MAX_SIZE`). Only regular files and directories come back, no symlinks. Globs are one level deep (`*`, `?`, `[a-z]`), no `**`. Locally only the latest job's artifacts are kept.
-- The run history is per project and lives in `.rwe/`, so deleting that directory deletes it. Copy, run, artifacts and cleanup times need a server newer than v0.6.0; with an older one they show as `-` and count as "other".
-- A workspace's caches are deleted with it; shared caches 30 days after the last job that used them (`RWE_CACHE_RETENTION`). There is no size cap.
+- Artifacts: only regular files and directories come back, no symlinks. Globs are one level deep (`*`, `?`, `[a-z]`), no `**`. Locally only the latest job's artifacts are kept.
+- Caches have no size cap.
 
 Planned: deployment notes.
 

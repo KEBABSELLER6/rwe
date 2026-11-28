@@ -77,7 +77,6 @@ yargs's `prepare` script, which takes 3.3s whatever is cached.
 | Warm | `npm install` | same | 4.6–4.7s | 26.1–26.4s | 3 |
 | Warm, `npm ci` | `npm ci` | same | 6.9s | 28.7s | 1 |
 
-- `npm test` takes 18s in every run (one outlier at 20.7s), so the caches only change the install.
 - Without the `prepare` script, npm's own share is about 5.6s with no cache, 3.5s with the npm
   cache and 1.2s with `node_modules` kept as well.
 - `node_modules` is 128 MB per workspace for yargs; the npm cache is 27 MB.
@@ -105,8 +104,6 @@ and both files in `.prettierignore`. Command
   still compiles, so the tests take the same 19.5s.
 - `node_modules` is 130 MB per workspace. The shared caches are 114 MB of store, 89 MB of
   metadata and 74 MB of corepack's copy of pnpm.
-- Measured in a fresh workspace: a `node_modules` cache left over from npm keeps npm's packages
-  around (pnpm moves them aside as `.ignored_*`), so delete `.rwe/workspace` after switching.
 
 ## Bun
 
@@ -148,8 +145,6 @@ three (`clap_lex`, `clap_builder`, `clap`).
 - The last three rows were re-measured on 2026-11-28 with server v0.4.0, which keeps file times
   when it copies the workspace for a job. Before that, cargo rebuilt the three local crates on
   every job, and a warm job took 16s even with no change.
-- After an edit, cargo rebuilds only the crates that changed and those depending on them
-  (`clap_builder` and `clap`, not `clap_lex`).
 - About 10s of a job after an edit is spent after the command exits, waiting for the ~500 MB of test
   binaries cargo rewrote to reach the disk. Writing 500 MB with `dd` shows the same: 0.4s inside
   the job, 9.9s for the job. The box's disk takes about 85 MB/s.
