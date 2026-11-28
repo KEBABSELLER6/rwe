@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"kebabseller6/rwe/internal/client"
 )
@@ -83,20 +84,35 @@ func runCmd(ctx context.Context, cfg config, args []string) (int, error) {
 
 	c := client.New(cfg.Server)
 	spec := client.JobSpec{Image: *image, Command: fs.Args(), TimeoutSeconds: *timeout, Caches: cfg.Caches, Artifacts: artifacts}
-	job, err := c.Run(ctx, cfg.dir, spec, func(line string) {
+	job, rec, err := c.Run(ctx, cfg.dir, spec, func(line string) {
 		fmt.Println(line)
 	})
 	if err != nil {
+		saveRun(cfg.dir, rec, err)
 		return 0, err
 	}
 
 	fmt.Fprintf(os.Stderr, "==> %s\n", summary(job))
-	if dst, err := c.FetchArtifacts(ctx, cfg.dir, job); err != nil {
+	start := time.Now()
+	dst, err := c.FetchArtifacts(ctx, cfg.dir, job)
+	rec.ArtifactsMS = time.Since(start).Milliseconds()
+	saveRun(cfg.dir, rec, nil)
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "==> artifacts: %v\n", err)
 	} else if dst != "" {
 		fmt.Fprintf(os.Stderr, "==> artifacts in %s\n", dst)
 	}
 	return exitCode(job), nil
+}
+
+func saveRun(dir string, rec client.RunRecord, err error) {
+	if err != nil {
+		rec.Error = err.Error()
+	}
+	rec.TotalMS = time.Since(rec.At).Milliseconds()
+	if err := client.SaveRun(dir, rec); err != nil {
+		fmt.Fprintf(os.Stderr, "rwe: save run record: %v\n", err)
+	}
 }
 
 func exitCode(job client.Job) int {

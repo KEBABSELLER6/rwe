@@ -26,7 +26,7 @@ func TestFetchArtifactsKeepsOnlyLatestJob(t *testing.T) {
 
 	var dsts []string
 	for range 2 {
-		job, err := c.Run(t.Context(), dir, spec, func(string) {})
+		job, _, err := c.Run(t.Context(), dir, spec, func(string) {})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -56,7 +56,7 @@ func TestFetchArtifactsWithoutArtifacts(t *testing.T) {
 	c := newTestClient(t)
 	dir := t.TempDir()
 	writeFiles(t, dir, map[string]string{"a.txt": "a"})
-	job, err := c.Run(t.Context(), dir, JobSpec{Image: "img", Command: []string{"ls"}}, func(string) {})
+	job, _, err := c.Run(t.Context(), dir, JobSpec{Image: "img", Command: []string{"ls"}}, func(string) {})
 	if err != nil {
 		t.Fatal(err)
 	}
