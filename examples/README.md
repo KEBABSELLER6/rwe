@@ -62,3 +62,4 @@ Tested setups, with timings in [BENCHMARKS.md](../BENCHMARKS.md):
 | Python (uv) | [`python/`](python/) |
 | Node (npm) | [`node/`](node/) |
 | Node (pnpm) | [`pnpm/`](pnpm/) |
+| Bun | [`bun/`](bun/) |
