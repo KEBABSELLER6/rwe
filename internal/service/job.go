@@ -45,19 +45,20 @@ type JobRequest struct {
 }
 
 type Job struct {
-	ID          uuid.UUID  `json:"id"`
-	WorkspaceID uuid.UUID  `json:"workspace_id"`
-	Image       string     `json:"image"`
-	Command     []string   `json:"command"`
-	Caches      []string   `json:"caches,omitempty"`
-	Status      JobStatus  `json:"status"`
-	ExitCode    *int       `json:"exit_code,omitempty"`
-	Error       string     `json:"error,omitempty"`
-	CreatedAt   time.Time  `json:"created_at"`
-	StartedAt   time.Time  `json:"started_at,omitzero"`
-	FinishedAt  time.Time  `json:"finished_at,omitzero"`
-	DurationMS  int64      `json:"duration_ms,omitzero"`
-	Artifacts   []Artifact `json:"artifacts,omitempty"`
+	ID          uuid.UUID        `json:"id"`
+	WorkspaceID uuid.UUID        `json:"workspace_id"`
+	Image       string           `json:"image"`
+	Command     []string         `json:"command"`
+	Caches      []string         `json:"caches,omitempty"`
+	Status      JobStatus        `json:"status"`
+	ExitCode    *int             `json:"exit_code,omitempty"`
+	Error       string           `json:"error,omitempty"`
+	CreatedAt   time.Time        `json:"created_at"`
+	StartedAt   time.Time        `json:"started_at,omitzero"`
+	FinishedAt  time.Time        `json:"finished_at,omitzero"`
+	DurationMS  int64            `json:"duration_ms,omitzero"`
+	PhasesMS    map[string]int64 `json:"phases_ms,omitempty"`
+	Artifacts   []Artifact       `json:"artifacts,omitempty"`
 
 	spec          RunSpec
 	artifactPaths []string
