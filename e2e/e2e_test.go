@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -37,18 +38,22 @@ func binaries(t *testing.T) string {
 	t.Helper()
 	buildOnce.Do(func() {
 		binDir, buildErr = os.MkdirTemp("", "rwe-e2e-")
-		for _, pkg := range []string{"server", "rwe"} {
+		steps := [][]string{
+			{"go", "build", "-o", filepath.Join(binDir, "server"), "../cmd/server"},
+			{"go", "build", "-o", filepath.Join(binDir, "rwe"), "../cmd/rwe"},
+			{"docker", "pull", "--quiet", image},
+		}
+		for _, step := range steps {
 			if buildErr != nil {
 				return
 			}
-			out, err := exec.Command("go", "build", "-o", filepath.Join(binDir, pkg), "../cmd/"+pkg).CombinedOutput()
-			if err != nil {
-				buildErr = errors.New(string(out))
+			if out, err := exec.Command(step[0], step[1:]...).CombinedOutput(); err != nil {
+				buildErr = fmt.Errorf("%s: %w\n%s", strings.Join(step, " "), err, out)
 			}
 		}
 	})
 	if buildErr != nil {
-		t.Fatalf("build binaries: %v", buildErr)
+		t.Fatalf("prepare e2e: %v", buildErr)
 	}
 	return binDir
 }
