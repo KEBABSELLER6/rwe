@@ -60,6 +60,9 @@ rwe version
 
 With the GitHub CLI, the first three lines are `gh release download -R KEBABSELLER6/rwe -p $f -p SHA256SUMS`
 followed by the same checksum line. For the server, use `rwe-server-linux-<arch>` the same way.
+
+With Homebrew (macOS or Linux): `brew install kebabseller6/rwe/rwe`.
+
 With Go installed, `go install github.com/KEBABSELLER6/rwe/cmd/rwe@latest` builds the client into
 `$(go env GOPATH)/bin` instead (`~/go/bin` by default). To build from a clone: `make build`.
 
@@ -108,5 +111,5 @@ Planned: deployment notes.
 ```sh
 make test    # go test -race ./...; e2e/ and Docker runner tests skip without Docker
 make vet
-make dist    # release binaries + SHA256SUMS in dist/
+goreleaser release --snapshot --clean   # release assets + SHA256SUMS in dist/
 ```

@@ -1,0 +1,91 @@
+version: 2
+
+project_name: rwe
+
+builds:
+  - id: rwe
+    main: ./cmd/rwe
+    binary: rwe
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{ .Tag }}
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+
+  - id: server
+    main: ./cmd/server
+    binary: rwe-server
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{ .Tag }}
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - id: rwe-binary
+    ids:
+      - rwe
+    formats:
+      - binary
+    name_template: "rwe-{{ .Os }}-{{ .Arch }}"
+
+  - id: server-binary
+    ids:
+      - server
+    formats:
+      - binary
+    name_template: "rwe-server-{{ .Os }}-{{ .Arch }}"
+
+  - id: rwe-cask
+    ids:
+      - rwe
+    formats:
+      - tar.gz
+    name_template: "rwe_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: SHA256SUMS
+  algorithm: sha256
+
+snapshot:
+  version_template: "{{ .Tag }}-next"
+
+homebrew_casks:
+  - name: rwe
+    ids:
+      - rwe-cask
+    binaries:
+      - rwe
+    homepage: "https://github.com/KEBABSELLER6/rwe"
+    description: "Run builds and tests on a spare machine instead of your laptop"
+    hooks:
+      post:
+        install_steps: |
+          on_macos do
+            run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ .StagedPath }}/rwe"]
+          end
+    repository:
+      owner: KEBABSELLER6
+      name: homebrew-rwe
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+
+release:
+  github:
+    owner: KEBABSELLER6
+    name: rwe
+
+changelog:
+  disable: true
