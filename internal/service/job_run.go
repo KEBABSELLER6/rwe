@@ -44,7 +44,9 @@ func (s *JobService) run(ctx context.Context, id uuid.UUID) {
 	s.saveOrWarn(job)
 	s.mu.Unlock()
 
-	code, collected, err := s.runOnCopy(ctx, id, spec, artifacts)
+	phases := newPhaseTimer()
+	code, collected, err := s.runOnCopy(ctx, id, spec, artifacts, phases)
+	phases.log(id)
 	s.workspaces.Release(job.WorkspaceID)
 
 	s.mu.Lock()
@@ -52,6 +54,7 @@ func (s *JobService) run(ctx context.Context, id uuid.UUID) {
 	defer s.saveOrWarn(job)
 	job.FinishedAt = time.Now()
 	job.DurationMS = job.FinishedAt.Sub(job.StartedAt).Milliseconds()
+	job.PhasesMS = phases.ms
 	job.Artifacts = collected
 	switch {
 	case err != nil && errors.Is(context.Cause(ctx), errCancelled):
@@ -71,10 +74,7 @@ func (s *JobService) run(ctx context.Context, id uuid.UUID) {
 	}
 }
 
-func (s *JobService) runOnCopy(ctx context.Context, id uuid.UUID, spec RunSpec, artifacts []string) (int, []Artifact, error) {
-	t := newPhaseTimer()
-	defer t.log(id)
-
+func (s *JobService) runOnCopy(ctx context.Context, id uuid.UUID, spec RunSpec, artifacts []string, t *phaseTimer) (int, []Artifact, error) {
 	filesDir := s.jobFilesDir(id)
 	defer func() {
 		forceRemoveAll(filesDir)
@@ -106,15 +106,17 @@ func (s *JobService) runWithLog(ctx context.Context, id uuid.UUID, spec RunSpec,
 type phaseTimer struct {
 	last  time.Time
 	attrs []any
+	ms    map[string]int64
 }
 
 func newPhaseTimer() *phaseTimer {
-	return &phaseTimer{last: time.Now()}
+	return &phaseTimer{last: time.Now(), ms: map[string]int64{}}
 }
 
 func (t *phaseTimer) done(phase string) {
 	now := time.Now()
 	t.attrs = append(t.attrs, phase, now.Sub(t.last).Round(time.Millisecond))
+	t.ms[phase] = now.Sub(t.last).Milliseconds()
 	t.last = now
 }
 

@@ -2,8 +2,10 @@ package service
 
 import (
 	"errors"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"uuid"
 )
@@ -35,6 +37,10 @@ func TestJobStore_FinishedJobSurvivesRestart(t *testing.T) {
 	}
 	if !got.FinishedAt.Equal(want.FinishedAt) || got.DurationMS != want.DurationMS || got.Image != want.Image {
 		t.Errorf("reloaded job = %+v, want %+v", got, want)
+	}
+	phases := slices.Sorted(maps.Keys(got.PhasesMS))
+	if want := []string{"artifacts", "cleanup", "copy", "run"}; !slices.Equal(phases, want) {
+		t.Errorf("phases = %v, want %v", phases, want)
 	}
 }
 
