@@ -127,3 +127,24 @@ func (h *JobHandler) HandleLogs(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, "\n\n")
 	rc.Flush()
 }
+
+func (h *JobHandler) HandleArtifacts(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r, "job")
+	if err != nil {
+		h.eh.HandleError(w, r, err)
+		return
+	}
+
+	root, err := h.s.OpenArtifacts(id)
+	if err != nil {
+		h.eh.HandleError(w, r, err)
+		return
+	}
+	defer root.Close()
+
+	w.Header().Set("Content-Type", "application/gzip")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", id.String()+"-artifacts.tar.gz"))
+	if err := service.WriteTarGz(w, root.FS()); err != nil {
+		h.eh.logger.ErrorContext(r.Context(), "stream artifacts", "job", id, "err", err)
+	}
+}

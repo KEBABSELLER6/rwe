@@ -5,6 +5,7 @@ import (
 	"io"
 	"kebabseller6/rwe/internal/manifest"
 	"kebabseller6/rwe/internal/service"
+	"os"
 	"uuid"
 )
 
@@ -19,4 +20,5 @@ type JobService interface {
 	FollowLogs(ctx context.Context, id uuid.UUID, emitLine func(line []byte) error) error
 	Get(id uuid.UUID) (service.Job, error)
 	Cancel(id uuid.UUID) (service.Job, error)
+	OpenArtifacts(id uuid.UUID) (*os.Root, error)
 }

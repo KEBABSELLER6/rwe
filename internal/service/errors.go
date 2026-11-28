@@ -7,4 +7,5 @@ var (
 	ErrTooLarge     = errors.New("too large")
 	ErrNotFound     = errors.New("not found")
 	ErrConflict     = errors.New("conflict")
+	ErrGone         = errors.New("gone")
 )
