@@ -28,6 +28,7 @@ type JobRequest struct {
 	MemoryBytes    int64    `json:"memory_bytes"`
 	CPUs           float64  `json:"cpus"`
 	Caches         []string `json:"caches"`
+	Artifacts      []string `json:"artifacts"`
 }
 
 func (h *JobHandler) HandleSubmit(w http.ResponseWriter, r *http.Request) {
@@ -52,6 +53,7 @@ func (h *JobHandler) HandleSubmit(w http.ResponseWriter, r *http.Request) {
 		Memory:       jr.MemoryBytes,
 		CPUs:         jr.CPUs,
 		Caches:       jr.Caches,
+		Artifacts:    jr.Artifacts,
 	}
 
 	j, err := h.s.Submit(req)
