@@ -16,7 +16,10 @@ import (
 	"kebabseller6/rwe/internal/service"
 )
 
-const testImage = "busybox:1.37"
+const (
+	testImage = "busybox:1.37"
+	testOwner = "rwe-test"
+)
 
 func requireDocker(t *testing.T) {
 	t.Helper()
@@ -46,7 +49,7 @@ func TestDocker_RunsInWorkspace(t *testing.T) {
 	}
 
 	var logs bytes.Buffer
-	code, err := NewDocker().Run(t.Context(), spec(dir, "sh", "-c", "cat in.txt; echo oops >&2; echo built > out.txt"), &logs)
+	code, err := NewDocker(testOwner).Run(t.Context(), spec(dir, "sh", "-c", "cat in.txt; echo oops >&2; echo built > out.txt"), &logs)
 	if err != nil {
 		t.Fatalf("Run: %v\nlogs:\n%s", err, logs.String())
 	}
@@ -69,7 +72,7 @@ func TestDocker_RunsInWorkspace(t *testing.T) {
 func TestDocker_ExitCode(t *testing.T) {
 	requireDocker(t)
 
-	code, err := NewDocker().Run(t.Context(), spec(t.TempDir(), "sh", "-c", "exit 3"), &bytes.Buffer{})
+	code, err := NewDocker(testOwner).Run(t.Context(), spec(t.TempDir(), "sh", "-c", "exit 3"), &bytes.Buffer{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +87,7 @@ func TestDocker_TimeoutRemovesContainer(t *testing.T) {
 	s.Timeout = 3 * time.Second
 
 	start := time.Now()
-	_, err := NewDocker().Run(t.Context(), s, &bytes.Buffer{})
+	_, err := NewDocker(testOwner).Run(t.Context(), s, &bytes.Buffer{})
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("err = %v, want DeadlineExceeded", err)
 	}
@@ -104,7 +107,7 @@ func TestDocker_BadImageIsError(t *testing.T) {
 	s.Image = "rwe-does-not-exist.invalid/nope:1"
 
 	var logs bytes.Buffer
-	_, err := NewDocker().Run(t.Context(), s, &logs)
+	_, err := NewDocker(testOwner).Run(t.Context(), s, &logs)
 	if err == nil {
 		t.Fatalf("expected error for missing image, logs:\n%s", logs.String())
 	}
@@ -113,7 +116,7 @@ func TestDocker_BadImageIsError(t *testing.T) {
 func TestDocker_CacheMountArgs(t *testing.T) {
 	s := spec("files", "true")
 	s.Caches = []service.CacheMount{{HostDir: "/data/caches/shared/abc", Path: "/tmp/.cache"}}
-	args, err := runArgs(s)
+	args, err := runArgs(s, testOwner)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -135,7 +138,7 @@ func TestDocker_CachesAreWritableAndKept(t *testing.T) {
 	}
 
 	var logs bytes.Buffer
-	if code, err := NewDocker().Run(t.Context(), s, &logs); err != nil || code != 0 {
+	if code, err := NewDocker(testOwner).Run(t.Context(), s, &logs); err != nil || code != 0 {
 		t.Fatalf("Run = %d, %v\nlogs:\n%s", code, err, logs.String())
 	}
 	for _, p := range []string{filepath.Join(shared, "x"), filepath.Join(inWorkspace, "y")} {
@@ -151,7 +154,7 @@ func TestDocker_CommandExitCodesDockerAlsoUses(t *testing.T) {
 		s := spec(t.TempDir(), "sh", "-c", fmt.Sprintf("exit %d", want))
 
 		var logs bytes.Buffer
-		code, err := NewDocker().Run(t.Context(), s, &logs)
+		code, err := NewDocker(testOwner).Run(t.Context(), s, &logs)
 		if err != nil || code != want {
 			t.Errorf("Run = %d, %v; want %d, nil\nlogs:\n%s", code, err, want, logs.String())
 		}
@@ -166,7 +169,7 @@ func TestDocker_MissingCommandIsExit127(t *testing.T) {
 	s := spec(t.TempDir(), "/does-not-exist")
 
 	var logs bytes.Buffer
-	code, err := NewDocker().Run(t.Context(), s, &logs)
+	code, err := NewDocker(testOwner).Run(t.Context(), s, &logs)
 	if err != nil || code != 127 {
 		t.Fatalf("Run = %d, %v; want 127, nil like a shell\nlogs:\n%s", code, err, logs.String())
 	}
@@ -181,11 +184,38 @@ func TestDocker_FailedStartIsError(t *testing.T) {
 	}
 
 	var logs bytes.Buffer
-	code, err := NewDocker().Run(t.Context(), s, &logs)
+	code, err := NewDocker(testOwner).Run(t.Context(), s, &logs)
 	if err == nil {
 		t.Fatalf("Run = %d, nil; want an error for a container that cannot start\nlogs:\n%s", code, logs.String())
 	}
 	if exec.Command("docker", "inspect", s.Name).Run() == nil {
 		t.Errorf("container %s still exists", s.Name)
+	}
+}
+
+func TestDocker_RemoveStaleRemovesOnlyOwnContainers(t *testing.T) {
+	requireDocker(t)
+	owner, other := "rwe-test-"+uuid.NewV7().String(), "rwe-test-"+uuid.NewV7().String()
+	start := func(owner string) string {
+		t.Helper()
+		out, err := exec.Command("docker", "run", "--detach", "--label", ownerLabel+"="+owner, testImage, "sleep", "60").Output()
+		if err != nil {
+			t.Fatalf("start container: %v", err)
+		}
+		id := strings.TrimSpace(string(out))
+		t.Cleanup(func() { exec.Command("docker", "rm", "--force", id).Run() })
+		return id
+	}
+	mine, theirs := start(owner), start(other)
+
+	removed, err := NewDocker(owner).RemoveStale(t.Context())
+	if err != nil || removed != 1 {
+		t.Fatalf("RemoveStale = %d, %v; want 1, nil", removed, err)
+	}
+	if exec.Command("docker", "inspect", mine).Run() == nil {
+		t.Errorf("own container %s still exists", mine)
+	}
+	if err := exec.Command("docker", "inspect", theirs).Run(); err != nil {
+		t.Errorf("other owner's container removed: %v", err)
 	}
 }

@@ -19,18 +19,35 @@ import (
 const (
 	pidsLimit     = "1024"
 	removeTimeout = 30 * time.Second
+	ownerLabel    = "rwe.owner"
 )
 
 type Docker struct {
 	binary string
+	owner  string
 }
 
-func NewDocker() *Docker {
-	return &Docker{binary: "docker"}
+func NewDocker(owner string) *Docker {
+	return &Docker{binary: "docker", owner: owner}
+}
+
+func (d *Docker) RemoveStale(ctx context.Context) (int, error) {
+	out, err := exec.CommandContext(ctx, d.binary, "ps", "--all", "--quiet", "--filter", "label="+ownerLabel+"="+d.owner).Output()
+	if err != nil {
+		return 0, fmt.Errorf("list stale containers: %w", err)
+	}
+	ids := strings.Fields(string(out))
+	if len(ids) == 0 {
+		return 0, nil
+	}
+	if out, err := exec.CommandContext(ctx, d.binary, append([]string{"rm", "--force"}, ids...)...).CombinedOutput(); err != nil {
+		return 0, fmt.Errorf("remove stale containers: %w: %s", err, out)
+	}
+	return len(ids), nil
 }
 
 func (d *Docker) Run(ctx context.Context, spec service.RunSpec, logs io.Writer) (int, error) {
-	args, err := runArgs(spec)
+	args, err := runArgs(spec, d.owner)
 	if err != nil {
 		return -1, err
 	}
@@ -62,7 +79,7 @@ func (d *Docker) Run(ctx context.Context, spec service.RunSpec, logs io.Writer) 
 	}
 }
 
-func runArgs(spec service.RunSpec) ([]string, error) {
+func runArgs(spec service.RunSpec, owner string) ([]string, error) {
 	if spec.Name == "" || spec.Image == "" || len(spec.Command) == 0 {
 		return nil, errors.New("run spec needs a name, image and command")
 	}
@@ -74,6 +91,7 @@ func runArgs(spec service.RunSpec) ([]string, error) {
 	args := []string{
 		"run",
 		"--name", spec.Name,
+		"--label", ownerLabel + "=" + owner,
 		"--init",
 		"--user", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()),
 		"--env", "HOME=/tmp",

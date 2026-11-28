@@ -62,7 +62,7 @@ Works today:
 
 Known limits:
 
-- A server restart ends queued and running jobs with status `error`; finished jobs survive.
+- A server restart ends queued and running jobs with status `error` and removes their containers; finished jobs survive.
 - Job logs are deleted 7 days after the job finishes (`RWE_LOG_RETENTION`); the job status is kept forever.
 - Workspaces are deleted 30 days after their last sync or job (`RWE_WORKSPACE_RETENTION`); the client then creates a new one.
 - A sync with a running job gets 409: one job per workspace at a time.
