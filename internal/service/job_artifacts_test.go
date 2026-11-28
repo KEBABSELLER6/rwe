@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"maps"
 	"os"
 	"path/filepath"
@@ -174,5 +175,36 @@ func TestJob_OpenArtifactsErrors(t *testing.T) {
 	os.RemoveAll(filepath.Join(filepath.Dir(env.jobs.logPath(running.ID)), artifactsDirName))
 	if _, err := env.jobs.OpenArtifacts(running.ID); !errors.Is(err, ErrGone) {
 		t.Errorf("expired artifacts: err = %v, want ErrGone", err)
+	}
+}
+
+func TestJob_DropsArtifactsOverSizeLimit(t *testing.T) {
+	env := newJobEnv(t, func(_ context.Context, spec RunSpec, _ io.Writer) (int, error) {
+		os.WriteFile(filepath.Join(spec.FilesDir, "a.bin"), make([]byte, 6), 0o644)
+		return 0, os.WriteFile(filepath.Join(spec.FilesDir, "b.bin"), make([]byte, 6), 0o644)
+	})
+	limits := DefaultJobLimits
+	limits.ArtifactMaxSize = 10
+	jobs, err := NewJobService(t.TempDir(), t.TempDir(), env.ws, env.runner, limits)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := env.request()
+	req.Artifacts = []string{"a.bin", "b.bin"}
+	job, err := jobs.Submit(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jobs.run(t.Context(), job.ID)
+
+	done, _ := jobs.Get(job.ID)
+	if done.Status != JobPassed || done.Artifacts != nil {
+		t.Errorf("status = %s, artifacts = %v; want passed with no artifacts", done.Status, done.Artifacts)
+	}
+	if _, err := os.Stat(jobs.artifactsDir(job.ID)); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("artifacts dir kept over the limit: %v", err)
+	}
+	if log, _ := os.ReadFile(jobs.logPath(job.ID)); !strings.Contains(string(log), "over the 10 byte limit") {
+		t.Errorf("log %q does not mention the limit", log)
 	}
 }

@@ -65,20 +65,24 @@ type Job struct {
 }
 
 type JobLimits struct {
-	DefaultTimeout time.Duration
-	MaxTimeout     time.Duration
-	QueueSize      int
-	MaxMemory      int64
-	LogRetention   time.Duration
-	CacheRetention time.Duration
+	DefaultTimeout    time.Duration
+	MaxTimeout        time.Duration
+	QueueSize         int
+	MaxMemory         int64
+	LogRetention      time.Duration
+	CacheRetention    time.Duration
+	ArtifactRetention time.Duration
+	ArtifactMaxSize   int64
 }
 
 var DefaultJobLimits = JobLimits{
-	DefaultTimeout: 10 * time.Minute,
-	MaxTimeout:     time.Hour,
-	QueueSize:      16,
-	LogRetention:   7 * 24 * time.Hour,
-	CacheRetention: 30 * 24 * time.Hour,
+	DefaultTimeout:    10 * time.Minute,
+	MaxTimeout:        time.Hour,
+	QueueSize:         16,
+	LogRetention:      7 * 24 * time.Hour,
+	CacheRetention:    30 * 24 * time.Hour,
+	ArtifactRetention: 24 * time.Hour,
+	ArtifactMaxSize:   256 << 20,
 }
 
 type WorkspaceLocker interface {

@@ -62,6 +62,7 @@ func (s *JobService) collectArtifacts(jobDir string, paths []string, log io.Writ
 	defer root.Close()
 
 	var collected []Artifact
+	var total int64
 	for _, p := range paths {
 		dst := path.Join(artifactsDirName, p)
 		err := moveArtifact(root, path.Join(filesDirName, p), dst)
@@ -78,8 +79,19 @@ func (s *JobService) collectArtifacts(jobDir string, paths []string, log io.Writ
 			fmt.Fprintf(log, "rwe: artifact %s: %v\n", p, err)
 		}
 		collected = append(collected, Artifact{Path: p, Size: size})
+		total += size
+	}
+
+	if limit := s.limits.ArtifactMaxSize; limit > 0 && total > limit {
+		fmt.Fprintf(log, "rwe: artifacts are %d bytes, over the %d byte limit; dropped\n", total, limit)
+		forceRemoveAll(filepath.Join(jobDir, artifactsDirName))
+		return nil
 	}
 	return collected
+}
+
+func (s *JobService) artifactsDir(id uuid.UUID) string {
+	return filepath.Join(s.dir, id.String(), artifactsDirName)
 }
 
 func moveArtifact(root *os.Root, src, dst string) error {
@@ -121,7 +133,7 @@ func (s *JobService) OpenArtifacts(id uuid.UUID) (*os.Root, error) {
 		return nil, fmt.Errorf("%w: job %s has no artifacts", ErrNotFound, id)
 	}
 
-	root, err := os.OpenRoot(filepath.Join(s.dir, id.String(), artifactsDirName))
+	root, err := os.OpenRoot(s.artifactsDir(id))
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, fmt.Errorf("%w: artifacts of job %s have expired", ErrGone, id)
 	}
