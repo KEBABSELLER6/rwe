@@ -32,7 +32,7 @@ See [Caches](#caches) for ready-made ones per stack.
 
 Later wins: built-in defaults (`http://localhost:8999`, `golang:1.27`) →
 `~/.config/rwe/config.json` → `<project>/.rwe.json` → `RWE_URL` / `RWE_IMAGE` → `rwe run -i IMAGE`.
-Both files accept `server`, `image` and `caches`; unknown keys are an error.
+Both files accept `server`, `image`, `caches` and `artifacts`; unknown keys are an error.
 
 The server has no config file: `-addr` / `-data` flags, defaulting to `RWE_ADDR` / `RWE_DATA`,
 then `:8999` / `local_data`. `RWE_JOB_MEMORY` (or `-job-memory`, e.g. `2g`) caps each job's memory:
@@ -43,6 +43,9 @@ finished; its status stays available. `0` keeps logs forever.
 after its last sync or job; the next `rwe run` uploads a fresh one. `0` keeps workspaces forever.
 `RWE_CACHE_RETENTION` (or `-cache-retention`, default `720h`) deletes a shared cache that long after
 the last job that used it. A workspace's own caches are deleted together with the workspace.
+`RWE_ARTIFACT_RETENTION` (or `-artifact-retention`, default `24h`) deletes a job's artifacts that long
+after it finished. `RWE_ARTIFACT_MAX_SIZE` (or `-artifact-max-size`, default `256m`) drops a job's
+artifacts when together they are larger; the job's status is unaffected. `0` turns either off.
 Under systemd, load the env file with
 `EnvironmentFile=/etc/rwe/server.env`; `systemctl restart rwe` picks up changes.
 
@@ -69,3 +72,18 @@ Tested setups, with timings in [BENCHMARKS.md](../BENCHMARKS.md):
 | Node (pnpm) | [`pnpm/`](pnpm/) |
 | Bun | [`bun/`](bun/) |
 | Rust | [`rust/`](rust/) |
+
+## Artifacts
+
+`artifacts` lists files or directories, relative to the project root, that come back after a job:
+
+```json
+{ "image": "golang:1.27", "artifacts": ["coverage.out", "dist"] }
+```
+
+- They are collected whatever the job's status, so a failed run's test reports come back too.
+- `rwe run -a PATH` (repeatable) and the MCP `run` tool's `artifacts` argument replace the list for one job.
+- They land in `.rwe/artifacts/<job id>/`, keeping their paths. Each download replaces the previous
+  job's, so only the latest are kept.
+- A path the job didn't create is noted in the job log, not an error. Paths inside a workspace
+  cache (e.g. `node_modules`) don't come back.

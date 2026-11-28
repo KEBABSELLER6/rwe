@@ -59,6 +59,7 @@ Works today:
 - `rwe mcp` with `run` and `logs` tools
 - User and project config files, env overrides
 - Cache directories kept between jobs (`caches` in `.rwe.json`); see [BENCHMARKS.md](BENCHMARKS.md)
+- Artifacts: files a job leaves behind, downloaded to `.rwe/artifacts/<job>/` (`artifacts` in `.rwe.json`, `rwe run -a`, or the MCP `run` tool); see [examples/](examples/#artifacts)
 
 Known limits:
 
@@ -67,10 +68,10 @@ Known limits:
 - Workspaces are deleted 30 days after their last sync or job (`RWE_WORKSPACE_RETENTION`); the client then creates a new one.
 - A sync with a running job gets 409: one job per workspace at a time.
 - Only the exec bit of a file is synced, not its full mode (files are 0644 or 0755).
-- Nothing comes back but the log: no artifacts yet.
+- Artifacts are deleted on the box 1 day after the job finishes (`RWE_ARTIFACT_RETENTION`) and dropped when a job's add up to more than 256 MB (`RWE_ARTIFACT_MAX_SIZE`). Only regular files and directories come back, no symlinks, and no globs yet. Locally only the latest job's artifacts are kept.
 - A workspace's caches are deleted with it; shared caches 30 days after the last job that used them (`RWE_CACHE_RETENTION`). There is no size cap.
 
-Planned, in rough order: release binaries, deployment notes, then artifacts.
+Planned, in rough order: release binaries, deployment notes.
 
 ## Development
 

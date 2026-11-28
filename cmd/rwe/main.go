@@ -15,7 +15,9 @@ var version = "dev"
 
 const usage = `usage:
   rwe mcp                                     serve MCP over stdio
-  rwe run [-i IMAGE] [-t SECONDS] -- CMD...   sync the current dir and run CMD remotely
+  rwe run [-i IMAGE] [-t SECONDS] [-a PATH]... -- CMD...
+                                              sync the current dir and run CMD remotely;
+                                              -a brings PATH back to .rwe/artifacts/<job>/
   rwe version`
 
 func main() {
@@ -65,14 +67,23 @@ func runCmd(ctx context.Context, cfg config, args []string) (int, error) {
 	fs := flag.NewFlagSet("run", flag.ExitOnError)
 	image := fs.String("i", cfg.Image, "container image")
 	timeout := fs.Int("t", 0, "timeout in seconds (0 = server default)")
+	var artifacts []string
+	fs.Func("a", "workspace path to bring back, repeatable; replaces artifacts in .rwe.json", func(p string) error {
+		artifacts = append(artifacts, p)
+		return nil
+	})
 	fs.Parse(args)
+	if artifacts == nil {
+		artifacts = cfg.Artifacts
+	}
 	if fs.NArg() == 0 {
 		fmt.Fprintln(os.Stderr, usage)
 		return 2, nil
 	}
 
 	c := client.New(cfg.Server)
-	job, err := c.Run(ctx, cfg.dir, client.JobSpec{Image: *image, Command: fs.Args(), TimeoutSeconds: *timeout, Caches: cfg.Caches}, func(line string) {
+	spec := client.JobSpec{Image: *image, Command: fs.Args(), TimeoutSeconds: *timeout, Caches: cfg.Caches, Artifacts: artifacts}
+	job, err := c.Run(ctx, cfg.dir, spec, func(line string) {
 		fmt.Println(line)
 	})
 	if err != nil {
@@ -80,6 +91,11 @@ func runCmd(ctx context.Context, cfg config, args []string) (int, error) {
 	}
 
 	fmt.Fprintf(os.Stderr, "==> %s\n", summary(job))
+	if dst, err := c.FetchArtifacts(ctx, cfg.dir, job); err != nil {
+		fmt.Fprintf(os.Stderr, "==> artifacts: %v\n", err)
+	} else if dst != "" {
+		fmt.Fprintf(os.Stderr, "==> artifacts in %s\n", dst)
+	}
 	return exitCode(job), nil
 }
 

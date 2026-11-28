@@ -33,14 +33,19 @@ func serveMCP(ctx context.Context, cfg config) error {
 				"command":         map[string]any{"type": "string", "description": "Shell command, run with sh -c in the project root, e.g. \"make test\""},
 				"image":           map[string]any{"type": "string", "description": "Container image, defaults to " + cfg.Image},
 				"timeout_seconds": map[string]any{"type": "integer", "description": "Job timeout; omit for the server default"},
+				"artifacts": map[string]any{
+					"type": "array", "items": map[string]any{"type": "string"},
+					"description": "Files or directories (relative to the project root) to copy back after the job, e.g. [\"coverage.out\", \"dist\"]; replaces the artifacts list in .rwe.json",
+				},
 			},
 			"required": []string{"command"},
 		},
 		Call: func(ctx context.Context, raw jsontext.Value) (string, error) {
 			var args struct {
-				Command        string `json:"command"`
-				Image          string `json:"image"`
-				TimeoutSeconds int    `json:"timeout_seconds"`
+				Command        string   `json:"command"`
+				Image          string   `json:"image"`
+				TimeoutSeconds int      `json:"timeout_seconds"`
+				Artifacts      []string `json:"artifacts"`
 			}
 			if err := json.Unmarshal(raw, &args); err != nil {
 				return "", err
@@ -51,14 +56,21 @@ func serveMCP(ctx context.Context, cfg config) error {
 			if args.Image == "" {
 				args.Image = cfg.Image
 			}
+			if args.Artifacts == nil {
+				args.Artifacts = cfg.Artifacts
+			}
 
 			var tail lineTail
-			spec := client.JobSpec{Image: args.Image, Command: []string{"sh", "-c", args.Command}, TimeoutSeconds: args.TimeoutSeconds, Caches: cfg.Caches}
+			spec := client.JobSpec{Image: args.Image, Command: []string{"sh", "-c", args.Command}, TimeoutSeconds: args.TimeoutSeconds, Caches: cfg.Caches, Artifacts: args.Artifacts}
 			job, err := c.Run(ctx, cfg.dir, spec, tail.add)
 			if err != nil {
 				return "", err
 			}
-			return formatRun(job, tail), nil
+			dst, err := c.FetchArtifacts(ctx, cfg.dir, job)
+			if err != nil {
+				dst = "not downloaded: " + err.Error()
+			}
+			return formatRun(job, tail, dst), nil
 		},
 	}
 
@@ -109,9 +121,15 @@ func (t *lineTail) add(line string) {
 	}
 }
 
-func formatRun(job client.Job, tail lineTail) string {
+func formatRun(job client.Job, tail lineTail, artifactsDir string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s\njob_id: %s\n", summary(job), job.ID)
+	if artifactsDir != "" {
+		fmt.Fprintf(&b, "artifacts: %s\n", artifactsDir)
+		for _, a := range job.Artifacts {
+			fmt.Fprintf(&b, "  %s (%d bytes)\n", a.Path, a.Size)
+		}
+	}
 	if tail.total > len(tail.lines) {
 		fmt.Fprintf(&b, "--- last %d of %d log lines (logs tool for more)\n", len(tail.lines), tail.total)
 	} else {

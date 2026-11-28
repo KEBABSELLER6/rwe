@@ -26,16 +26,18 @@ type JobSpec struct {
 	Command        []string `json:"command"`
 	TimeoutSeconds int      `json:"timeout_seconds,omitzero"`
 	Caches         []string `json:"caches,omitempty"`
+	Artifacts      []string `json:"artifacts,omitempty"`
 }
 
 type Job struct {
-	ID         string    `json:"id"`
-	Image      string    `json:"image"`
-	Command    []string  `json:"command"`
-	Status     JobStatus `json:"status"`
-	ExitCode   *int      `json:"exit_code"`
-	Error      string    `json:"error"`
-	DurationMS int64     `json:"duration_ms"`
+	ID         string     `json:"id"`
+	Image      string     `json:"image"`
+	Command    []string   `json:"command"`
+	Status     JobStatus  `json:"status"`
+	ExitCode   *int       `json:"exit_code"`
+	Error      string     `json:"error"`
+	DurationMS int64      `json:"duration_ms"`
+	Artifacts  []Artifact `json:"artifacts"`
 }
 
 func (c *Client) Run(ctx context.Context, dir string, spec JobSpec, emit func(line string)) (Job, error) {
