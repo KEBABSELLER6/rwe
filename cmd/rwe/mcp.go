@@ -110,7 +110,39 @@ func serveMCP(ctx context.Context, cfg config) error {
 		},
 	}
 
-	return mcp.NewServer("rwe", version, run, logs).Serve(ctx, os.Stdin, os.Stdout)
+	return mcp.NewServer("rwe", version, run, logs, statsTool(cfg)).Serve(ctx, os.Stdin, os.Stdout)
+}
+
+func statsTool(cfg config) mcp.Tool {
+	return mcp.Tool{
+		Name: "stats",
+		Description: "Show the most recent rwe runs of this project, recorded on this machine in .rwe/runs.jsonl: " +
+			"status counts, p50/p90 total time, where the time went (sync, queue, copy, run, artifacts, cleanup, other) " +
+			"and per run the status, timings, workspace hash, job id and command. " +
+			"Use it to compare runs, find slow or flaky ones, or check which files a run had.",
+		InputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"limit": map[string]any{"type": "integer", "description": fmt.Sprintf("Number of recent runs. Default %d", defaultStatsRuns)},
+			},
+		},
+		Call: func(_ context.Context, raw jsontext.Value) (string, error) {
+			args := struct {
+				Limit int `json:"limit"`
+			}{Limit: defaultStatsRuns}
+			if err := json.Unmarshal(raw, &args); err != nil {
+				return "", err
+			}
+			if args.Limit <= 0 {
+				args.Limit = defaultStatsRuns
+			}
+			runs, err := client.LoadRuns(cfg.dir, args.Limit)
+			if err != nil {
+				return "", err
+			}
+			return formatStats(runs), nil
+		},
+	}
 }
 
 type lineTail struct {
