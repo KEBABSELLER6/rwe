@@ -23,23 +23,25 @@ import (
 
 const unknownID = "00000000-0000-7000-8000-000000000000"
 
-type noopRunner struct{}
-
-func (noopRunner) Run(context.Context, service.RunSpec, io.Writer) (int, error) { return 0, nil }
-
 func newTestServer(t *testing.T) *httptest.Server {
+	t.Helper()
+	srv, _ := newTestServerWith(t, scriptRunner{})
+	return srv
+}
+
+func newTestServerWith(t *testing.T, runner service.Runner) (*httptest.Server, string) {
 	t.Helper()
 	data := t.TempDir()
 	ws, err := service.NewWorkspaceService(filepath.Join(data, "workspaces"), service.DefaultWorkspaceLimits.Retention)
 	if err != nil {
 		t.Fatal(err)
 	}
-	jobs, err := service.NewJobService(filepath.Join(data, "jobs"), filepath.Join(data, "caches"), ws, noopRunner{}, service.DefaultJobLimits)
+	jobs, err := service.NewJobService(filepath.Join(data, "jobs"), filepath.Join(data, "caches"), ws, runner, service.DefaultJobLimits)
 	if err != nil {
 		t.Fatal(err)
 	}
 	go jobs.Start(t.Context())
-	return serve(t, ws, jobs)
+	return serve(t, ws, jobs), data
 }
 
 func serve(t *testing.T, ws WorkspaceService, jobs JobService) *httptest.Server {
