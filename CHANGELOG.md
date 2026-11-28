@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.7.0](https://github.com/KEBABSELLER6/rwe/compare/v0.6.0...v0.7.0) (2026-11-28)
+
+
+### Features
+
+* client reconnects when the log stream drops ([#52](https://github.com/KEBABSELLER6/rwe/issues/52)) ([0523d8a](https://github.com/KEBABSELLER6/rwe/commit/0523d8a7b1bda5db09309bd40c817d9166a316c0))
+* install the client with go install ([#54](https://github.com/KEBABSELLER6/rwe/issues/54)) ([c150728](https://github.com/KEBABSELLER6/rwe/commit/c15072806d06c00fba37443b2ca631828a72d3d0))
+* MCP stats tool for recent runs ([#49](https://github.com/KEBABSELLER6/rwe/issues/49)) ([ed14d3c](https://github.com/KEBABSELLER6/rwe/commit/ed14d3c8e934765f1952b1cc40f136aa1ba6e733))
+* record each run in .rwe/runs.jsonl ([#47](https://github.com/KEBABSELLER6/rwe/issues/47)) ([a7c3b01](https://github.com/KEBABSELLER6/rwe/commit/a7c3b0116b6bcc62f5784b38ef7353011ba6c960))
+* release with GoReleaser and publish a Homebrew cask ([#55](https://github.com/KEBABSELLER6/rwe/issues/55)) ([243cff4](https://github.com/KEBABSELLER6/rwe/commit/243cff49569028623f52b418c49c4cfb4af365f6))
+* requeue queued jobs after a server restart ([#51](https://github.com/KEBABSELLER6/rwe/issues/51)) ([966146d](https://github.com/KEBABSELLER6/rwe/commit/966146d2b7e83cec8509c8d688cbf7eb9fcc637b))
+* rwe stats shows recent runs ([#48](https://github.com/KEBABSELLER6/rwe/issues/48)) ([01126c6](https://github.com/KEBABSELLER6/rwe/commit/01126c61012cd38c6c66418d22d1b4f0db144b42))
+* store job phase timings in job.json ([#45](https://github.com/KEBABSELLER6/rwe/issues/45)) ([834ecb7](https://github.com/KEBABSELLER6/rwe/commit/834ecb72bbea282c5f35bf5b28a0bf0a68fad997))
+
 ## [0.6.0](https://github.com/KEBABSELLER6/rwe/compare/v0.5.0...v0.6.0) (2026-11-28)
 
 
