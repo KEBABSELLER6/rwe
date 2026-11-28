@@ -35,7 +35,7 @@ func serveMCP(ctx context.Context, cfg config) error {
 				"timeout_seconds": map[string]any{"type": "integer", "description": "Job timeout; omit for the server default"},
 				"artifacts": map[string]any{
 					"type": "array", "items": map[string]any{"type": "string"},
-					"description": "Files or directories (relative to the project root) to copy back after the job, e.g. [\"coverage.out\", \"dist\"]; replaces the artifacts list in .rwe.json",
+					"description": "Files or directories (relative to the project root) to copy back after the job, e.g. [\"coverage.out\", \"dist\", \"reports/*.xml\"]; globs use * ? [a-z] within one path segment; replaces the artifacts list in .rwe.json",
 				},
 			},
 			"required": []string{"command"},

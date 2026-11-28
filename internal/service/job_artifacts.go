@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
@@ -16,8 +17,9 @@ import (
 )
 
 const (
-	artifactsDirName = "artifacts"
-	maxArtifacts     = 16
+	artifactsDirName   = "artifacts"
+	maxArtifacts       = 16
+	maxArtifactMatches = 1000
 )
 
 type Artifact struct {
@@ -38,6 +40,9 @@ func validateArtifacts(paths []string) ([]string, error) {
 		if c == "." {
 			return nil, fmt.Errorf("%w: artifact %q would be the whole workspace", ErrInvalidInput, p)
 		}
+		if _, err := path.Match(c, ""); err != nil {
+			return nil, fmt.Errorf("%w: artifact %q: %w", ErrInvalidInput, p, err)
+		}
 		clean = append(clean, c)
 	}
 
@@ -50,8 +55,8 @@ func validateArtifacts(paths []string) ([]string, error) {
 	return clean, nil
 }
 
-func (s *JobService) collectArtifacts(jobDir string, paths []string, log io.Writer) []Artifact {
-	if len(paths) == 0 {
+func (s *JobService) collectArtifacts(jobDir string, patterns []string, log io.Writer) []Artifact {
+	if len(patterns) == 0 {
 		return nil
 	}
 	root, err := os.OpenRoot(jobDir)
@@ -61,9 +66,15 @@ func (s *JobService) collectArtifacts(jobDir string, paths []string, log io.Writ
 	}
 	defer root.Close()
 
+	files, err := fs.Sub(root.FS(), filesDirName)
+	if err != nil {
+		fmt.Fprintf(log, "rwe: collect artifacts: %v\n", err)
+		return nil
+	}
+
 	var collected []Artifact
 	var total int64
-	for _, p := range paths {
+	for _, p := range expandArtifacts(files, patterns, log) {
 		dst := path.Join(artifactsDirName, p)
 		err := moveArtifact(root, path.Join(filesDirName, p), dst)
 		switch {
@@ -92,6 +103,32 @@ func (s *JobService) collectArtifacts(jobDir string, paths []string, log io.Writ
 
 func (s *JobService) artifactsDir(id uuid.UUID) string {
 	return filepath.Join(s.dir, id.String(), artifactsDirName)
+}
+
+func expandArtifacts(fsys fs.FS, patterns []string, log io.Writer) []string {
+	matched := map[string]bool{}
+	for _, pattern := range patterns {
+		matches, _ := fs.Glob(fsys, pattern)
+		if len(matches) == 0 {
+			fmt.Fprintf(log, "rwe: artifact %s not found\n", pattern)
+		}
+		for _, m := range matches {
+			matched[m] = true
+		}
+	}
+
+	var paths []string
+	for _, p := range slices.Sorted(maps.Keys(matched)) {
+		if n := len(paths); n > 0 && strings.HasPrefix(p, paths[n-1]+"/") {
+			continue
+		}
+		if len(paths) == maxArtifactMatches {
+			fmt.Fprintf(log, "rwe: artifacts match more than %d paths; the rest are skipped\n", maxArtifactMatches)
+			break
+		}
+		paths = append(paths, p)
+	}
+	return paths
 }
 
 func moveArtifact(root *os.Root, src, dst string) error {

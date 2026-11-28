@@ -81,9 +81,11 @@ Tested setups, with timings in [BENCHMARKS.md](../BENCHMARKS.md):
 { "image": "golang:1.27", "artifacts": ["coverage.out", "dist"] }
 ```
 
+- Entries may be globs, matched after the job: `*`, `?` and `[a-z]` within one path segment, e.g.
+  `reports/*/junit.xml`. There is no `**`. A match inside another match comes back once, with its parent.
 - They are collected whatever the job's status, so a failed run's test reports come back too.
 - `rwe run -a PATH` (repeatable) and the MCP `run` tool's `artifacts` argument replace the list for one job.
 - They land in `.rwe/artifacts/<job id>/`, keeping their paths. Each download replaces the previous
   job's, so only the latest are kept.
-- A path the job didn't create is noted in the job log, not an error. Paths inside a workspace
+- A path or glob that matches nothing is noted in the job log, not an error. Paths inside a workspace
   cache (e.g. `node_modules`) don't come back.
