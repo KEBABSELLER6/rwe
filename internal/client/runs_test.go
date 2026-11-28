@@ -63,3 +63,27 @@ func TestSaveRunKeepsLatest(t *testing.T) {
 		}
 	}
 }
+
+func TestLoadRuns(t *testing.T) {
+	dir := t.TempDir()
+	if runs, err := LoadRuns(dir, 20); err != nil || runs != nil {
+		t.Fatalf("without a file: %v, %v; want nothing", runs, err)
+	}
+	for i := range 5 {
+		if err := SaveRun(dir, RunRecord{JobID: fmt.Sprint(i)}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	runs, err := LoadRuns(dir, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ids []string
+	for _, r := range runs {
+		ids = append(ids, r.JobID)
+	}
+	if got := strings.Join(ids, ","); got != "2,3,4" {
+		t.Errorf("loaded jobs %s, want 2,3,4", got)
+	}
+}

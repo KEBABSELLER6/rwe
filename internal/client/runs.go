@@ -3,6 +3,7 @@ package client
 import (
 	"encoding/json/v2"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -65,4 +66,24 @@ func SaveRun(dir string, rec RunRecord) error {
 		return err
 	}
 	return os.Rename(tmp, path)
+}
+
+func LoadRuns(dir string, n int) ([]RunRecord, error) {
+	raw, err := os.ReadFile(runsFile(dir))
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	lines := slices.DeleteFunc(strings.Split(string(raw), "\n"), func(l string) bool { return l == "" })
+	lines = lines[max(0, len(lines)-n):]
+
+	runs := make([]RunRecord, len(lines))
+	for i, line := range lines {
+		if err := json.Unmarshal([]byte(line), &runs[i]); err != nil {
+			return nil, fmt.Errorf("%s: %w", runsFile(dir), err)
+		}
+	}
+	return runs, nil
 }
