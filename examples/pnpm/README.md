@@ -25,6 +25,8 @@ Then run tests with `rwe run -- sh -c 'corepack pnpm install --frozen-lockfile &
 - Without `storeDir`, pnpm puts the store inside `node_modules`, since the default store is on a
   different filesystem from the project. Then nothing is shared between workspaces.
 - The store and `node_modules` are separate mounts, so pnpm copies files instead of hard-linking.
+- Switching a project from npm: a `node_modules` cache left over from npm keeps npm's packages
+  around (pnpm moves them aside as `.ignored_*`), so delete `.rwe/workspace` to start fresh.
 
 ## Results
 

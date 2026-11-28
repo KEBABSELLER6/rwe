@@ -42,7 +42,8 @@ finished; its status stays available. `0` keeps logs forever.
 `RWE_WORKSPACE_RETENTION` (or `-workspace-retention`, default `720h`) deletes a workspace that long
 after its last sync or job; the next `rwe run` uploads a fresh one. `0` keeps workspaces forever.
 `RWE_CACHE_RETENTION` (or `-cache-retention`, default `720h`) deletes a shared cache that long after
-the last job that used it. A workspace's own caches are deleted together with the workspace.
+the last job that used it; `0` keeps them forever. A workspace's own caches are deleted together with
+the workspace.
 `RWE_ARTIFACT_RETENTION` (or `-artifact-retention`, default `24h`) deletes a job's artifacts that long
 after it finished. `RWE_ARTIFACT_MAX_SIZE` (or `-artifact-max-size`, default `256m`) drops a job's
 artifacts when together they are larger; the job's status is unaffected. `0` turns either off.
