@@ -60,3 +60,26 @@ pyright, ruff, tox and others) before running about 2,600 tests.
   Caching `.venv` skips that.
 - click's dependencies are small. A project with large packages (numpy, torch) should gain more
   from the uv cache, since downloads would dominate; not measured here.
+
+## Node (npm)
+
+[yargs](https://github.com/yargs/yargs) at `9588a76`, a TypeScript project, with
+`npm ci && npm test` or `npm install && npm test`, image `node:24`. `npm test` compiles with `tsc`,
+runs mocha under c8 coverage, then eslint and prettier. The install step also runs `tsc` through
+yargs's `prepare` script, which takes 3.3s whatever is cached.
+
+| Case | Install | `caches` | Install time | Job time | Runs |
+|---|---|---|---|---|---|
+| No cache | `npm ci` | none | 8.9s | 30.8–32.8s | 2 |
+| First run with cache (fills it) | `npm ci` | `/tmp/.npm` | 8.6s | 30.5s | 1 |
+| Warm | `npm ci` | same | 6.8–7.2s | 29.2–32.0s | 3 |
+| First run with `node_modules` cached | `npm install` | `/tmp/.npm`, `/workspace/node_modules` | 6.7s | 28.8s | 1 |
+| Warm | `npm install` | same | 4.6–4.7s | 26.1–26.4s | 3 |
+| Warm, `npm ci` | `npm ci` | same | 6.9s | 28.7s | 1 |
+
+- `npm test` takes 18s in every run (one outlier at 20.7s), so the caches only change the install.
+- Without the `prepare` script, npm's own share is about 5.6s with no cache, 3.5s with the npm
+  cache and 1.2s with `node_modules` kept as well.
+- `node_modules` is 128 MB per workspace for yargs; the npm cache is 27 MB.
+- The very first job took 72.3s because the box was pulling `node:24`; that happens once per
+  image and is left out above.
