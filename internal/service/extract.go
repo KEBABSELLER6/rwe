@@ -12,7 +12,7 @@ import (
 	"os"
 	"path"
 
-	"kebabseller6/rwe/internal/manifest"
+	"github.com/KEBABSELLER6/rwe/internal/manifest"
 )
 
 func extract(ctx context.Context, r io.Reader, dst string, lim WorkspaceLimits) (manifest.Manifest, error) {

@@ -15,7 +15,7 @@ import (
 	"strings"
 	"testing"
 
-	"kebabseller6/rwe/internal/service"
+	"github.com/KEBABSELLER6/rwe/internal/service"
 )
 
 type scriptRunner struct{}

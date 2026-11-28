@@ -3,10 +3,11 @@ package handler
 import (
 	"context"
 	"io"
-	"kebabseller6/rwe/internal/manifest"
-	"kebabseller6/rwe/internal/service"
 	"os"
 	"uuid"
+
+	"github.com/KEBABSELLER6/rwe/internal/manifest"
+	"github.com/KEBABSELLER6/rwe/internal/service"
 )
 
 type WorkspaceService interface {

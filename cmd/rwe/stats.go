@@ -8,7 +8,7 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"kebabseller6/rwe/internal/client"
+	"github.com/KEBABSELLER6/rwe/internal/client"
 )
 
 const defaultStatsRuns = 20

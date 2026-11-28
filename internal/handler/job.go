@@ -3,9 +3,10 @@ package handler
 import (
 	"encoding/json/v2"
 	"fmt"
-	"kebabseller6/rwe/internal/service"
 	"net/http"
 	"time"
+
+	"github.com/KEBABSELLER6/rwe/internal/service"
 )
 
 type JobHandler struct {

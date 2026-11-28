@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"kebabseller6/rwe/internal/manifest"
+	"github.com/KEBABSELLER6/rwe/internal/manifest"
 )
 
 type entry struct {

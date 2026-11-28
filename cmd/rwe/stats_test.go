@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"kebabseller6/rwe/internal/client"
+	"github.com/KEBABSELLER6/rwe/internal/client"
 )
 
 func TestFormatStats(t *testing.T) {

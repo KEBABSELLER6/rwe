@@ -12,7 +12,7 @@ import (
 	"slices"
 	"uuid"
 
-	"kebabseller6/rwe/internal/manifest"
+	"github.com/KEBABSELLER6/rwe/internal/manifest"
 )
 
 func (s *WorkspaceService) PutBlob(ctx context.Context, id uuid.UUID, sum string, body io.Reader) (remaining int, err error) {

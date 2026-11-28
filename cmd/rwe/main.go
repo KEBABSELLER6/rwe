@@ -9,10 +9,15 @@ import (
 	"syscall"
 	"time"
 
-	"kebabseller6/rwe/internal/client"
+	"github.com/KEBABSELLER6/rwe/internal/buildinfo"
+	"github.com/KEBABSELLER6/rwe/internal/client"
 )
 
 var version = "dev"
+
+func init() {
+	version = buildinfo.Version(version)
+}
 
 const usage = `usage:
   rwe mcp                                     serve MCP over stdio

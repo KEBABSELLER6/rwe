@@ -60,7 +60,8 @@ rwe version
 
 With the GitHub CLI, the first three lines are `gh release download -R KEBABSELLER6/rwe -p $f -p SHA256SUMS`
 followed by the same checksum line. For the server, use `rwe-server-linux-<arch>` the same way.
-To build from source instead: `make build`, or `go install ./cmd/rwe` from a clone.
+With Go installed, `go install github.com/KEBABSELLER6/rwe/cmd/rwe@latest` builds the client into
+`$(go env GOPATH)/bin` instead (`~/go/bin` by default). To build from a clone: `make build`.
 
 `~/.local/bin` must be on your `PATH`; macOS doesn't add it by default. If `rwe version` still shows
 the old version, either an older `rwe` comes first on `PATH` (`which -a rwe` lists them all) or your

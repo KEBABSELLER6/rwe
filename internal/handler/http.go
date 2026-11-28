@@ -3,10 +3,11 @@ package handler
 import (
 	"encoding/json/v2"
 	"fmt"
-	"kebabseller6/rwe/internal/service"
 	"mime"
 	"net/http"
 	"uuid"
+
+	"github.com/KEBABSELLER6/rwe/internal/service"
 )
 
 func pathID(r *http.Request, kind string) (uuid.UUID, error) {

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"kebabseller6/rwe/internal/client"
+	"github.com/KEBABSELLER6/rwe/internal/client"
 )
 
 func TestStatsTool(t *testing.T) {

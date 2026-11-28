@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"kebabseller6/rwe/internal/handler"
-	"kebabseller6/rwe/internal/service"
+	"github.com/KEBABSELLER6/rwe/internal/handler"
+	"github.com/KEBABSELLER6/rwe/internal/service"
 )
 
 type lsRunner struct{}

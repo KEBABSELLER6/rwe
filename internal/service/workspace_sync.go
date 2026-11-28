@@ -8,7 +8,7 @@ import (
 	"slices"
 	"uuid"
 
-	"kebabseller6/rwe/internal/manifest"
+	"github.com/KEBABSELLER6/rwe/internal/manifest"
 )
 
 func (s *WorkspaceService) Sync(ctx context.Context, id uuid.UUID, want manifest.Manifest, sizes map[string]int64, executable []string) ([]string, error) {
